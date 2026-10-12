@@ -117,6 +117,7 @@ function World.buildLobby(): Folder
 		size = Vector3.new(sx, 0.25, sz),
 		cframe = CFrame.new(0, G - 0.125, 0),
 		color = P.grassLight,
+		material = Enum.Material.Grass,
 	})
 
 	-- Xadrez: só os quadrados escuros são peças, o claro é a base.
@@ -132,6 +133,7 @@ function World.buildLobby(): Folder
 					size = Vector3.new(W.tile, 0.05, W.tile),
 					cframe = CFrame.new(-sx / 2 + (ix + 0.5) * W.tile, G + 0.025, -sz / 2 + (iz + 0.5) * W.tile),
 					color = P.grassDark,
+					material = Enum.Material.Grass,
 					collide = false,
 				})
 			end
@@ -145,6 +147,7 @@ function World.buildLobby(): Folder
 		size = Vector3.new(sx - 20, 0.1, 12),
 		cframe = CFrame.new(0, G + 0.08, pathZ),
 		color = P.sand,
+		material = Enum.Material.Sand,
 		collide = false,
 	})
 	for _, side in { -1, 1 } do
@@ -180,6 +183,7 @@ function World.buildLobby(): Folder
 					size = size,
 					cframe = CFrame.new(pos.X, G + half / 2 + layer * half, pos.Z),
 					color = color,
+					material = Enum.Material.Brick,
 				})
 			end
 		end
@@ -191,6 +195,7 @@ function World.buildLobby(): Folder
 					size = Vector3.new(capLength, 1.2, 8),
 					cframe = CFrame.new(origin.X + side * (gap + capLength / 2), G + h + 0.6, origin.Z),
 					color = P.grassDark,
+					material = Enum.Material.LeafyGrass,
 				})
 			end
 			return
@@ -201,6 +206,7 @@ function World.buildLobby(): Folder
 			size = capSize,
 			cframe = CFrame.new(origin.X, G + h + 0.6, origin.Z),
 			color = P.grassDark,
+			material = Enum.Material.LeafyGrass,
 		})
 	end
 	wallRun(sx, Vector3.new(0, 0, sz / 2 + 3), true)

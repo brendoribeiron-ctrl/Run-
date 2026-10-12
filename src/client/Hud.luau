@@ -221,7 +221,7 @@ local function buildStats(root: ScreenGui): (Instance, Instance)
 end
 
 local function buildTopRight(root: ScreenGui)
-	local block = Ui.frame(root, "TopRight", UDim2.fromOffset(200, 250), UDim2.new(1, -14, 0, 8), nil, Vector2.new(1, 0))
+	local block = Ui.frame(root, "TopRight", UDim2.fromOffset(200, 380), UDim2.new(1, -14, 0, 8), nil, Vector2.new(1, 0))
 	Ui.autoScale(block)
 
 	local function iconButton(name: string, glyph: string, text: string, status: string, top: Color3, bottom: Color3, x: number, y: number, badge: boolean)
@@ -240,6 +240,15 @@ local function buildTopRight(root: ScreenGui)
 	end
 	iconButton("DailyButton", "✅", "DAILY", "READY!", Color3.fromRGB(150, 255, 150), Color3.fromRGB(40, 190, 70), 10, 0, true)
 	iconButton("PlaytimeButton", "🎁", "PLAYTIME", "4:59", Color3.fromRGB(255, 210, 120), Color3.fromRGB(240, 130, 30), 106, 0, true)
+	-- teleporte para a zona de carga, ao lado do VIP; o clique e a hora de esconder ficam em Run.luau
+	if not root:FindFirstChild("GoZoneButton", true) then
+		local go = squareButton(block, "GoZoneButton", "🏁", "CORRER", Color3.fromRGB(150, 255, 150), Color3.fromRGB(40, 190, 70), 0)
+		go.Position = UDim2.fromOffset(10, 128)
+	end
+	if not root:FindFirstChild("AuraButton", true) then
+		local aura = squareButton(block, "AuraButton", "✨", "AURAS", Color3.fromRGB(200, 150, 255), Color3.fromRGB(120, 50, 220), 0)
+		aura.Position = UDim2.fromOffset(106, 256)
+	end
 	iconButton("VipButton", "👑", "VIP", "R$ 399", Color3.fromRGB(255, 240, 130), Color3.fromRGB(245, 170, 20), 106, 128, false)
 end
 
@@ -295,6 +304,7 @@ local function select(index: number)
 	local current = player:GetAttribute("Selected")
 	selectRemote:FireServer(if current == index then 0 else index)
 end
+Hud.select = select
 
 local function buildHotbar(root: ScreenGui)
 	local count = Config.Inventory.hotbarSlots
@@ -302,7 +312,37 @@ local function buildHotbar(root: ScreenGui)
 	local block = Ui.frame(root, "Hotbar", UDim2.fromOffset(count * (size + gap), 132), UDim2.new(0.5, 0, 1, -10), nil, Vector2.new(0.5, 1))
 	Ui.autoScale(block)
 	hintLabel = Ui.text(block, { name = "Hint", text = "", color = P.yellowLine, size = UDim2.new(1, 300, 0, 24), position = UDim2.new(0.5, 0, 0, 0), anchor = Vector2.new(0.5, 0), textSize = 20, stroke = 3 })
-	Ui.text(block, { name = "Backpack", text = "(G) Open Backpack", size = UDim2.new(1, 0, 0, 20), position = UDim2.fromOffset(0, 40), textSize = 16, stroke = 2 })
+	-- botão da mochila: no teclado é a tecla G; no toque (sem tecla) é este botão
+	local touchOnly = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
+	local backpack = Ui.frame(block, "BackpackButton", UDim2.fromOffset(210, 30), UDim2.new(0.5, 0, 0, 29), Color3.fromRGB(24, 28, 46), Vector2.new(0.5, 0))
+	backpack.BackgroundTransparency = 0.25
+	Ui.corner(backpack, 10)
+	Ui.border(backpack, 3)
+	Ui.text(backpack, { name = "Label", text = if touchOnly then "🎒 Open Backpack" else "🎒 (G) Open Backpack", size = UDim2.fromScale(1, 1), textSize = 17, stroke = 2 })
+	local backpackHit = Ui.hit(backpack, "Hit")
+	Ui.juice(backpackHit, backpack)
+	backpackHit.Activated:Connect(function()
+		local handler = handlers.BackpackButton
+		if handler then
+			handler()
+		end
+	end)
+	-- automáticos, um de cada lado da mochila; texto, cor e clique ficam em Auto.luau
+	for index, name in Config.AutoOrder do
+		local holder = Ui.frame(block, "Auto" .. name, UDim2.fromOffset(160, 30), UDim2.new(if index == 1 then 0 else 1, 0, 0, 29), Color3.fromRGB(24, 28, 46), Vector2.new(if index == 1 then 0 else 1, 0))
+		holder.BackgroundTransparency = 0.15
+		Ui.corner(holder, 10)
+		Ui.border(holder, 3)
+		Ui.text(holder, { name = "Label", text = Config.Auto[name].label, size = UDim2.fromScale(1, 1), textSize = 16, stroke = 2 })
+		local hit = Ui.hit(holder, "Hit")
+		Ui.juice(hit, holder)
+		hit.Activated:Connect(function()
+			local handler = handlers["Auto" .. name]
+			if handler then
+				handler()
+			end
+		end)
+	end
 
 	for index = 1, count do
 		local frame = Ui.frame(block, "Slot" .. index, UDim2.fromOffset(size, size), UDim2.fromOffset((index - 1) * (size + gap) + gap / 2, 64), Color3.fromRGB(24, 28, 46))

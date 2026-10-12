@@ -64,6 +64,17 @@ function Pose.weight(name: string, target: number, instant: boolean?)
 	end
 end
 
+-- Pose atual de uma junta (já com as camadas) e peso de uma camada; usados pelos testes.
+function Pose.transform(joint: string): CFrame?
+	local motor = motors[joint]
+	return if motor and motor.Parent then motor.Transform else nil
+end
+
+function Pose.current(name: string): number
+	local layer = layers[name]
+	return if layer then layer.weight else 0
+end
+
 -- Ciclo de corrida exagerado para uma fase (radianos): pernas largas, joelho dobrando na
 -- recuperação, braços dobrados bombeando ao contrário das pernas, tronco torcendo e quicando.
 -- amp = amplitude (1 = corrida forte), lean = inclinação do corpo em graus.

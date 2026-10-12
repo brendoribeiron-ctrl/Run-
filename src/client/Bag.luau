@@ -10,8 +10,11 @@ local UserInputService = game:GetService("UserInputService")
 
 local Config = require(ReplicatedStorage.Shared.Config)
 local Aura = require(script.Parent.Aura)
+local Auto = require(script.Parent.Auto)
 local Fx = require(script.Parent.Fx)
 local Pose = require(script.Parent.Pose)
+local Super = require(script.Parent.Super)
+local Windows = require(script.Parent.Windows)
 
 local P = Config.Palette
 local player = Players.LocalPlayer
@@ -340,6 +343,11 @@ function Bag.start()
 	end)
 
 	bagHit.OnClientEvent:Connect(onHit)
+	-- o super soco balança o saco bem mais que um soco comum
+	Super.onImpact = function()
+		local root = rootPart()
+		velocity += (if root and root.Position.X < bagCenter.X then 1 else -1) * 26
+	end
 
 	UserInputService.InputBegan:Connect(function(input, processed)
 		if not processed and isPunchInput(input) then
@@ -356,7 +364,7 @@ function Bag.start()
 	-- segurar o botão repete o soco; o servidor ainda aplica o próprio intervalo
 	task.spawn(function()
 		while true do
-			if (holding or pending) and inRange() then
+			if (holding or pending or Auto.isOn("punch")) and inRange() and not Super.isBusy() and not Windows.current() then
 				pending = false
 				startPunch()
 				bagHit:FireServer()

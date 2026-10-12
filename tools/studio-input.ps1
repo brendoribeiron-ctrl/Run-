@@ -20,6 +20,7 @@ public static class StudioInput {
 	[DllImport("user32.dll")] public static extern void keybd_event(byte vk, byte scan, uint flags, UIntPtr extra);
 	[DllImport("user32.dll")] public static extern void mouse_event(uint flags, uint dx, uint dy, uint data, UIntPtr extra);
 	[DllImport("user32.dll")] public static extern bool SetProcessDPIAware();
+	[DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();
 }
 '@
 
@@ -28,7 +29,7 @@ $studio = Get-Process RobloxStudioBeta -ErrorAction SilentlyContinue | Where-Obj
 if (-not $studio) { Write-Error 'Roblox Studio não está aberto.'; exit 1 }
 $handle = $studio.MainWindowHandle
 
-$keys = @{ F5 = 0x74; F8 = 0x77; SHIFT = 0x10; CTRL = 0x11; ALT = 0x12; W = 0x57; A = 0x41; S = 0x53; D = 0x44; E = 0x45; Q = 0x51; K = 0x4B; P = 0x50; V = 0x56; ENTER = 0x0D; TAB = 0x09; SPACE = 0x20; ESC = 0x1B }
+$keys = @{ F5 = 0x74; F8 = 0x77; SHIFT = 0x10; CTRL = 0x11; ALT = 0x12; W = 0x57; A = 0x41; S = 0x53; D = 0x44; E = 0x45; Q = 0x51; K = 0x4B; G = 0x47; P = 0x50; V = 0x56; ENTER = 0x0D; TAB = 0x09; SPACE = 0x20; ESC = 0x1B }
 
 function Send-Key([int]$vk, [bool]$up) {
 	$scan = [byte][StudioInput]::MapVirtualKey([uint32]$vk, 0)
@@ -43,6 +44,8 @@ function Focus-Studio {
 	Send-Key 0x12 $false; Send-Key 0x12 $true
 	[StudioInput]::SetForegroundWindow($handle) | Out-Null
 	Start-Sleep -Milliseconds 300
+	# sem o Studio na frente os cliques e teclas cairiam em outra janela: melhor não mandar nada
+	if ([StudioInput]::GetForegroundWindow() -ne $handle) { Write-Error 'Studio nao veio para a frente; nada foi enviado.'; exit 2 }
 }
 
 function Move-To([double]$fx, [double]$fy) {
@@ -51,7 +54,10 @@ function Move-To([double]$fx, [double]$fy) {
 	$x = [int]($rect.Left + ($rect.Right - $rect.Left) * $fx)
 	$y = [int]($rect.Top + ($rect.Bottom - $rect.Top) * $fy)
 	[StudioInput]::SetCursorPos($x, $y) | Out-Null
-	Start-Sleep -Milliseconds 80
+	# um vai-e-volta de 1 px: os botões da barra do Studio só aceitam o clique depois de um movimento real
+	[StudioInput]::mouse_event(1, 1, 0, 0, [UIntPtr]::Zero)
+	[StudioInput]::mouse_event(1, [uint32]4294967295, 0, 0, [UIntPtr]::Zero)
+	Start-Sleep -Milliseconds 200
 }
 
 Focus-Studio

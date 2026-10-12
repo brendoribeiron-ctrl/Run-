@@ -4,22 +4,19 @@
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
 
 local Config = require(ReplicatedStorage.Shared.Config)
 local Format = require(ReplicatedStorage.Shared.Format)
 local Hud = require(script.Parent.Hud)
 local Ui = require(script.Parent.Ui)
+local Windows = require(script.Parent.Windows)
 
 local P = Config.Palette
 local player = Players.LocalPlayer
 
 local Stats = {}
 
-local window: Frame
-local scale: UIScale
-local open = false
 local rows: { [string]: { level: TextLabel, effect: TextLabel, price: TextLabel, button: TextButton, fill: Frame } } = {}
 
 local ICONS = { speed = "👟", critChance = "🎯", critDamage = "💥" }
@@ -56,64 +53,8 @@ local function refresh()
 	end
 end
 
-local function setOpen(value: boolean)
-	open = value
-	if value then
-		window.Visible = true
-		refresh()
-		scale.Scale = 0.6
-		TweenService:Create(scale, TweenInfo.new(0.25, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Scale = 1 }):Play()
-	else
-		local tween = TweenService:Create(scale, TweenInfo.new(0.15, Enum.EasingStyle.Quad, Enum.EasingDirection.In), { Scale = 0.6 })
-		tween.Completed:Connect(function()
-			if not open then
-				window.Visible = false
-			end
-		end)
-		tween:Play()
-	end
-end
-
 local function build(remote: RemoteEvent)
-	local gui = Instance.new("ScreenGui")
-	gui.Name = "Windows"
-	gui.ResetOnSpawn = false
-	gui.DisplayOrder = 20
-	gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-	gui.Parent = player:WaitForChild("PlayerGui")
-
-	window = Ui.frame(gui, "Skills", UDim2.fromOffset(520, 400), UDim2.fromScale(0.5, 0.5), P.navy, Vector2.new(0.5, 0.5))
-	window.Visible = false
-	Ui.corner(window, 22)
-	Ui.border(window, 6, P.cyan)
-	scale = Instance.new("UIScale")
-	scale.Parent = window
-
-	local title = Ui.text(window, { name = "Title", text = "ATTRIBUTES", color = P.yellowLine, size = UDim2.fromOffset(300, 52), position = UDim2.new(0.5, 0, 0, -22), anchor = Vector2.new(0.5, 0), stroke = 5, z = 3 })
-	title.BackgroundTransparency = 0
-	title.BackgroundColor3 = P.red
-	title.Rotation = -2
-	Ui.corner(title, 12)
-	Ui.border(title, 4)
-
-	local close = Instance.new("TextButton")
-	close.Name = "Close"
-	close.AnchorPoint = Vector2.new(0.5, 0.5)
-	close.Position = UDim2.new(1, -8, 0, 8)
-	close.Size = UDim2.fromOffset(44, 44)
-	close.BackgroundColor3 = P.red
-	close.Font = Enum.Font.FredokaOne
-	close.TextSize = 28
-	close.TextColor3 = Ui.white
-	close.Text = "X"
-	close.ZIndex = 4
-	Ui.corner(close, 12)
-	Ui.border(close, 4)
-	Ui.juice(close)
-	close.Activated:Connect(function()
-		setOpen(false)
-	end)
-	close.Parent = window
+	local window = Windows.create("Skills", "ATTRIBUTES", Vector2.new(520, 400), P.cyan, refresh)
 
 	for index, name in Config.StatOrder do
 		local stat = Config.Stats[name]
@@ -157,21 +98,6 @@ local function build(remote: RemoteEvent)
 		rows[name] = { level = level, effect = effect, price = price, button = button, fill = fill }
 	end
 
-	-- escala a janela inteira em telas pequenas
-	local fit = Instance.new("UIScale")
-	fit.Name = "Fit"
-	local wrapper = Ui.frame(gui, "Fit", UDim2.fromScale(1, 1))
-	window.Parent = wrapper
-	local camera = workspace.CurrentCamera
-	local function resize()
-		local view = camera.ViewportSize
-		fit.Scale = math.min(1.1, view.Y / 520, view.X / 600)
-	end
-	fit.Parent = wrapper
-	camera:GetPropertyChangedSignal("ViewportSize"):Connect(resize)
-	resize()
-	wrapper.AnchorPoint = Vector2.new(0.5, 0.5)
-	wrapper.Position = UDim2.fromScale(0.5, 0.5)
 end
 
 function Stats.start()
@@ -179,16 +105,16 @@ function Stats.start()
 	build(remote)
 
 	Hud.onClick("SkillsButton", function()
-		setOpen(not open)
+		Windows.toggle("Skills")
 	end)
 	UserInputService.InputBegan:Connect(function(input, processed)
 		if not processed and input.KeyCode == Enum.KeyCode.K then
-			setOpen(not open)
+			Windows.toggle("Skills")
 		end
 	end)
 
 	local function onChange()
-		if open then
+		if Windows.isOpen("Skills") then
 			refresh()
 		end
 	end

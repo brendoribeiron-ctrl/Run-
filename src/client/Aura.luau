@@ -39,6 +39,7 @@ local rootPart: BasePart? = nil
 local boost = 0
 local sprint = 0
 local nextArc = 0
+local hidden = false
 local rng = Random.new()
 
 function Aura.tier(): number
@@ -47,6 +48,11 @@ function Aura.tier(): number
 end
 
 function Aura.color(): Color3
+	-- aura equipada no painel AURAS: cor própria (a primeira acompanha o tier do Poder)
+	local equipped = Config.AuraById[player:GetAttribute("Aura") :: any]
+	if equipped and not equipped.followTier then
+		return equipped.color
+	end
 	local tier = Aura.tier()
 	-- Common é cinza: a aura só troca de cor a partir do segundo tier
 	return if tier >= 2 then Config.Rarities[tier].color else BASE_COLOR
@@ -120,6 +126,40 @@ local function apply()
 			rock.Color = color:Lerp(WHITE, 0.3)
 		end
 	end
+	-- escondida (painel aberto): nada emite nem brilha
+	for _, particles in { dark, flames, core, sparks, mist } do
+		if particles then
+			particles.Enabled = not hidden
+		end
+	end
+	if light then
+		light.Enabled = not hidden
+	end
+	if outline then
+		outline.Enabled = not hidden
+	end
+	if hidden then
+		for _, t in trails do
+			t.Enabled = false
+		end
+	end
+end
+
+-- Some com a aura inteira (fogo, casca, pedras, contorno) enquanto um painel está aberto:
+-- com a câmera atrás do ombro, as chamas cobririam a tela.
+function Aura.setHidden(on: boolean)
+	if hidden == on then
+		return
+	end
+	hidden = on
+	if on then
+		for _, particles in { dark, flames, core, sparks, mist } do
+			if particles then
+				particles:Clear()
+			end
+		end
+	end
+	apply()
 end
 
 -- 0 = parado, 1 = carga cheia
@@ -336,10 +376,18 @@ function Aura.start()
 		task.spawn(attach, player.Character)
 	end
 	player:GetAttributeChangedSignal("Power"):Connect(apply)
+	player:GetAttributeChangedSignal("Aura"):Connect(apply)
 
 	RunService.RenderStepped:Connect(function()
 		local bubble, root = shell, rootPart
 		if not bubble or not root or not root.Parent then
+			return
+		end
+		if hidden then
+			bubble.Transparency = 1
+			for _, rock in rocks do
+				rock.Transparency = 1
+			end
 			return
 		end
 		local now = os.clock()

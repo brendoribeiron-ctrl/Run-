@@ -93,6 +93,30 @@ Config.Run = {
 	minCharge = 0.15, -- soltar antes disso cancela
 	endPadding = 60, -- studs de corredor depois da última parede
 	returnDelay = 1.4, -- segundos entre o fim da corrida e a volta ao terreno
+	-- botão CORRER do HUD: teleporta para a zona de carga
+	teleportCooldown = 3, -- segundos entre dois teleportes do mesmo jogador
+	teleportOffset = Vector3.new(0, 4, 4), -- ponto de chegada, a partir de zoneCenter (de frente para o corredor)
+}
+
+-- Linhas de velocidade da corrida (2D, atrás do HUD): radiais, nascem perto do centro e
+-- aceleram para as bordas. AJUSTE AQUI.
+Config.SpeedLines = {
+	count = 64, -- quantas linhas na tela
+	length = 0.5, -- comprimento na borda, em fração da meia-diagonal da tela
+	lengthAtBirth = 0.3, -- fração do comprimento (e da espessura) quando a linha nasce
+	thickness = NumberRange.new(3, 11), -- espessura na borda, em pixels
+	flowSpeed = 0.85, -- velocidade de fluxo: frações do caminho centro->borda por segundo
+	acceleration = 1.5, -- quanto a linha acelera ao se afastar do centro (0 = constante)
+	maxOpacity = 0.9, -- opacidade da linha mais forte (0-1)
+	innerRadius = 0.2, -- raio do centro limpo, em fração da meia-diagonal
+	center = Vector2.new(0.5, 0.44), -- ponto de fuga na tela (fração): o fim do corredor
+	birthFade = 0.08, -- trecho do caminho em que a linha recém-nascida aparece aos poucos
+	fadeIn = 0.25, -- segundos para aparecer no início da corrida
+	fadeOut = 0.35, -- segundos para sumir no fim
+	minIntensity = 0.65, -- intensidade na largada; chega a 1 na última parede
+	wallPulse = 0.5, -- reforço de intensidade ao estourar uma parede
+	pulseTime = 0.35, -- segundos que esse reforço dura
+	whiteChance = 0.35, -- parte das linhas que fica branca em vez da cor do tier
 }
 
 -- tier = índice em Config.Rarities. A corrida para na primeira parede que o jogador não quebra.
@@ -151,6 +175,61 @@ Config.Characters = {
 	{ id = "abyss_titan", name = "Abyss Titan", rarity = 6, income = 250_000, body = rgb(20, 40, 90), pants = rgb(10, 15, 40), glove = rgb(60, 255, 220), hat = "horns" },
 }
 
+-- Super soco: cada soco no saco tem uma chance pequena (menor que a do crítico) de abrir um
+-- minigame de apertar a tecla mostrada quando o marcador passa pela zona verde. Acertou tudo: soco gigante. Errou: o
+-- boneco é jogado para longe. AJUSTE AQUI.
+Config.Super = {
+	chance = 0.025, -- chance de um soco virar super soco (o crítico começa em 8%)
+	keys = { "Z", "X", "C", "V" }, -- teclas sorteadas (no toque, o próprio quadro da tecla é o botão)
+	steps = 3, -- teclas por minigame
+	stepTime = 2.0, -- segundos que o marcador leva para cruzar a barra na 1ª tecla
+	speedUp = 0.9, -- cada tecla seguinte leva este tanto do tempo da anterior
+	zoneWidth = 0.26, -- largura da zona verde, em fração da barra
+	tolerance = 0.04, -- folga invisível antes e depois da zona verde (ajuda quem joga com atraso)
+	stepPause = 0.35, -- respiro, em segundos, entre uma tecla certa e o marcador da próxima
+	zoneRange = NumberRange.new(0.4, 0.66), -- onde a zona verde pode começar
+	multiplier = 80, -- ganho do super soco = poder do saco x isto
+	ejectSpeed = 60, -- erro: velocidade horizontal com que o boneco é jogado (studs/s)
+	ejectUp = 45, -- erro: velocidade para cima
+	stunTime = 1.2, -- erro: segundos caído antes de levantar
+	windTime = 0.55, -- acerto: segundos juntando energia antes do soco
+	holdTime = 0.5, -- acerto: segundos com o braço esticado depois do impacto
+	cameraLinger = 0.45, -- acerto: segundos que a câmera de cinema ainda fica depois do golpe
+	latency = 0.3, -- servidor: folga de rede ao conferir se deu tempo de acertar
+	grace = 3, -- servidor: segundos além do fim da barra antes de desistir do cliente
+}
+
+-- Painel 3D das janelas (estilo "painel do sistema"): flutua na frente do boneco, com a câmera
+-- atrás do ombro. Posições em studs, relativas ao boneco (X = direita, Y = cima, -Z = frente).
+-- AJUSTE AQUI.
+Config.Panel = {
+	size = Vector2.new(6.6, 5.1), -- largura e altura do painel no mundo
+	canvas = Vector2.new(800, 620), -- resolução do painel, em pixels (mesma proporção de size)
+	margin = 70, -- pixels livres em volta da janela, para o halo e as cantoneiras
+	brightness = 1.5, -- brilho da interface (com o Bloom, é o que faz a borda brilhar)
+	lightBrightness = 0.7, -- luz azulada que o painel joga no boneco
+	offset = Vector3.new(3.4, 2.7, -2.6), -- centro do painel
+	facing = Vector3.new(0.4, 2.6, 3.4), -- ponto para onde o painel fica virado
+	cameraOffset = Vector3.new(-0.9, 2.9, 2.8), -- câmera: atrás e acima do ombro esquerdo
+	lookAt = Vector3.new(3.0, 2.4, -2.6), -- ponto que a câmera olha
+	fieldOfView = 58,
+	openTime = 0.38, -- segundos para abrir (e para fechar)
+	openTwist = 55, -- graus que o painel nasce virado de lado
+	maxTilt = 7, -- inclinação máxima seguindo o cursor, em graus
+	tiltSpeed = 9, -- quão rápido a inclinação segue o cursor
+	leash = 7, -- o painel fecha se o boneco se afastar mais que isto de onde abriu
+	armIdle = 3, -- segundos com o cursor parado até o braço descer
+	armDrop = 0.5, -- o braço aponta este tanto abaixo do cursor, para a mão não cobrir o clique
+}
+
+-- Automáticos: cada um é liberado por Game Pass (passId, 0 = ainda sem passe criado) ou
+-- comprado uma vez com dinheiro do jogo. Depois de liberado, liga e desliga no botão do HUD.
+Config.Auto = {
+	punch = { label = "AUTO CLICK", info = "Punches the bag for you while you stand next to it.", price = 25_000, passId = 0 },
+	super = { label = "AUTO SUPER", info = "Lands every Super Punch for you. No minigame, no miss.", price = 250_000, passId = 0 },
+}
+Config.AutoOrder = { "punch", "super" }
+
 -- Golpe crítico no saco: chance e multiplicador base; os atributos somam por nível.
 Config.Crit = {
 	baseChance = 0.08,
@@ -177,8 +256,45 @@ Config.Move = {
 	dashSpeed = 90,
 	dashTime = 0.2,
 	dashCooldown = 1.1,
+	-- parafuso do dash no chão (voo deitado girando no próprio eixo). AJUSTE AQUI.
+	dashRollTurns = 1, -- voltas completas
+	dashRollTime = 0.3, -- segundos do giro; a pose deitada dura até ele acabar
+	-- "flat" = gira deitado como hélice (eixo vertical); "barrel" = parafuso em torno do próprio corpo
+	dashRollStyle = "barrel",
 	doubleJumpPower = 60,
+	-- Animação de caminhada própria (ex.: "rbxassetid://123456"). Vazio = braços levemente
+	-- para trás por código, somados à caminhada padrão.
+	walkAnimationId = "",
 }
+
+-- Vitrine da loja. Só layout por enquanto: nenhum produto está ligado.
+Config.Shop = {
+	{ id = "double_power", name = "2x POWER", icon = "👊" },
+	{ id = "double_money", name = "2x MONEY", icon = "💰" },
+	{ id = "lucky_roll", name = "LUCKY ROLL", icon = "🍀" },
+	{ id = "auto_punch", name = "AUTO PUNCH", icon = "🤖" },
+}
+
+-- Só layout por enquanto: nenhuma recompensa é entregue.
+Config.Daily = { days = 7 }
+Config.Playtime = { minutes = { 5, 10, 15, 30, 45, 60 } }
+
+-- Auras: cada uma libera ao atingir `power` de Poder e, equipada, multiplica todo ganho de
+-- Poder (soco, crítico e super soco). Bônus pequeno de propósito. followTier = a cor acompanha
+-- o tier do Poder em vez de usar `color`.
+Config.Auras = {
+	{ id = "ember", name = "EMBER", power = 0, multiplier = 1, color = rgb(255, 120, 20), followTier = true },
+	{ id = "spark", name = "SPARK", power = 1_000, multiplier = 1.05, color = rgb(255, 230, 80), followTier = false },
+	{ id = "frost", name = "FROST", power = 25_000, multiplier = 1.1, color = rgb(120, 220, 255), followTier = false },
+	{ id = "venom", name = "VENOM", power = 250_000, multiplier = 1.15, color = rgb(120, 255, 90), followTier = false },
+	{ id = "storm", name = "STORM", power = 2_000_000, multiplier = 1.2, color = rgb(170, 110, 255), followTier = false },
+	{ id = "solar", name = "SOLAR", power = 20_000_000, multiplier = 1.3, color = rgb(255, 150, 40), followTier = false },
+	{ id = "void", name = "VOID", power = 200_000_000, multiplier = 1.4, color = rgb(255, 60, 160), followTier = false },
+}
+Config.AuraById = {}
+for _, info in Config.Auras do
+	Config.AuraById[info.id] = info
+end
 
 Config.CharacterById = {}
 for _, info in Config.Characters do

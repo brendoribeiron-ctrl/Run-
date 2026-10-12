@@ -19,6 +19,8 @@ export type Profile = {
 	stored: { [string]: number }, -- dinheiro acumulado em cada pedestal
 	index: { [string]: boolean }, -- personagens já obtidos
 	stats: { [string]: number }, -- nível de cada atributo de Config.Stats
+	unlocks: { [string]: boolean }, -- automáticos de Config.Auto já liberados
+	aura: string, -- id da aura equipada (Config.Auras)
 }
 
 type Session = {
@@ -43,6 +45,8 @@ local function defaults(): Profile
 		stored = {},
 		index = {},
 		stats = {},
+		unlocks = {},
+		aura = Config.Auras[1].id,
 	}
 end
 
@@ -92,6 +96,16 @@ local function sanitize(raw: any): Profile
 			end
 		end
 	end
+	if type(raw.aura) == "string" and Config.AuraById[raw.aura] then
+		profile.aura = raw.aura
+	end
+	if type(raw.unlocks) == "table" then
+		for name in Config.Auto do
+			if raw.unlocks[name] == true then
+				profile.unlocks[name] = true
+			end
+		end
+	end
 	if type(raw.index) == "table" then
 		for id, seen in raw.index do
 			if Config.CharacterById[id] and seen == true then
@@ -111,9 +125,21 @@ local function mirror(player: Player, profile: Profile)
 	player:SetAttribute("Money", profile.money)
 	player:SetAttribute("BagLevel", profile.bagLevel)
 	player:SetAttribute("Inventory", table.concat(profile.inventory, ","))
+	-- índice: ids já obtidos, na ordem do Config (a janela INDEX lê daqui)
+	local found = {}
+	for _, info in Config.Characters do
+		if profile.index[info.id] then
+			table.insert(found, info.id)
+		end
+	end
+	player:SetAttribute("Index", table.concat(found, ","))
 	for name in Config.Stats do
 		player:SetAttribute("Stat_" .. name, profile.stats[name] or 0)
 	end
+	for name in Config.Auto do
+		player:SetAttribute("Auto_" .. name, profile.unlocks[name] == true)
+	end
+	player:SetAttribute("Aura", profile.aura)
 end
 
 function PlayerData.load(player: Player): boolean

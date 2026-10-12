@@ -18,9 +18,11 @@ local Hud = require(script.Parent.Hud)
 local Pose = require(script.Parent.Pose)
 local Roll = require(script.Parent.Roll)
 local Ui = require(script.Parent.Ui)
+local Windows = require(script.Parent.Windows)
 
 local P = Config.Palette
 local RUN = Config.Run
+local LINES = Config.SpeedLines
 local player = Players.LocalPlayer
 local camera = workspace.CurrentCamera
 local rng = Random.new()
@@ -40,7 +42,14 @@ local distanceBar: Frame
 local marker: Frame
 local multiplier: TextLabel
 local linesGui: ScreenGui
-local lines: { Frame } = {}
+-- dist = posição no caminho centro->borda (0-1); pace = ritmo próprio da linha
+type Line = { frame: Frame, angle: number, dist: number, pace: number, thick: number, white: boolean }
+local lines: { Line } = {}
+local linesAlpha = 0 -- opacidade geral agora
+local linesTarget = 0 -- 1 durante a corrida, 0 fora dela
+local linesPower = 0 -- progresso da corrida (0-1)
+local linesPulse = 0 -- reforço que decai depois de cada parede
+local goButton: GuiObject?
 local popup: TextLabel
 
 local cubes: { Part } = {}
@@ -165,9 +174,14 @@ local function buildUi()
 	linesGui.DisplayOrder = 1
 	linesGui.Enabled = false
 	linesGui.Parent = player:WaitForChild("PlayerGui")
-	for i = 1, 46 do
-		local line = Ui.frame(linesGui, "Line", UDim2.fromOffset(100, 4), nil, Ui.white, Vector2.new(0, 0.5))
-		lines[i] = line
+	for i = 1, LINES.count do
+		-- âncora no meio: a rotação de um Frame é sempre em torno do centro dele
+		local frame = Ui.frame(linesGui, "Line", UDim2.fromOffset(100, 4), nil, Ui.white, Vector2.new(0.5, 0.5))
+		-- ponta de dentro some, ponta de fora cheia
+		local taper = Instance.new("UIGradient")
+		taper.Transparency = NumberSequence.new(1, 0)
+		taper.Parent = frame
+		lines[i] = { frame = frame, angle = 0, dist = 0, pace = 1, thick = 1, white = false }
 	end
 	-- fica no HUD e não junto das linhas: precisa aparecer depois que elas somem ("TOO WEAK!")
 	popup = Ui.text(hud, { name = "Popup", text = "", size = UDim2.new(0.5, 0, 0, 90), position = UDim2.fromScale(0.5, 0.3), anchor = Vector2.new(0.5, 0.5), stroke = 6 })
@@ -218,17 +232,62 @@ local function buildWorld()
 	tint.Parent = game:GetService("Lighting")
 end
 
-local function showLines(center: Vector2, viewport: Vector2)
+-- Linhas de velocidade: todas apontam para o ponto de fuga, nascem perto dele e aceleram
+-- para as bordas. Os números ficam em Config.SpeedLines.
+local function spawnLine(line: Line, dist: number)
+	line.angle = rng:NextNumber(0, math.pi * 2)
+	line.dist = dist
+	line.pace = rng:NextNumber(0.7, 1.3)
+	line.thick = rng:NextNumber(LINES.thickness.Min, LINES.thickness.Max)
+	line.white = rng:NextNumber() < LINES.whiteChance
+end
+
+-- Liga (com as linhas já espalhadas pelo caminho) ou desliga; o fade acontece em stepLines.
+local function setLines(on: boolean)
+	linesTarget = if on then 1 else 0
+	if on then
+		linesPower, linesPulse = 0, 0
+		for _, line in lines do
+			spawnLine(line, rng:NextNumber())
+		end
+	end
+end
+
+-- Roda a cada quadro, em qualquer estado, enquanto houver linha visível.
+local function stepLines(dt: number)
+	if linesAlpha < linesTarget then
+		linesAlpha = math.min(linesTarget, linesAlpha + dt / LINES.fadeIn)
+	elseif linesAlpha > linesTarget then
+		linesAlpha = math.max(linesTarget, linesAlpha - dt / LINES.fadeOut)
+	end
+	if linesAlpha <= 0 then
+		linesGui.Enabled = false
+		return
+	end
+	linesGui.Enabled = true
+	linesPulse = math.max(0, linesPulse - dt / LINES.pulseTime)
+	local strength = LINES.minIntensity + (1 - LINES.minIntensity) * math.clamp(linesPower + linesPulse * LINES.wallPulse, 0, 1)
+
+	local viewport = camera.ViewportSize
+	local center = viewport * LINES.center
 	local reach = viewport.Magnitude / 2
+	local inner = reach * LINES.innerRadius
 	for _, line in lines do
-		local angle = rng:NextNumber(0, math.pi * 2)
-		local start = reach * rng:NextNumber(0.22, 0.6)
-		local length = reach * rng:NextNumber(0.25, 0.8)
-		line.Position = UDim2.fromOffset(center.X + math.cos(angle) * start, center.Y + math.sin(angle) * start)
-		line.Size = UDim2.fromOffset(length, rng:NextNumber(2, 9))
-		line.Rotation = math.deg(angle)
-		line.BackgroundColor3 = if rng:NextNumber() < 0.35 then Ui.white else lineColor
-		line.BackgroundTransparency = rng:NextNumber(0.1, 0.55)
+		line.dist += LINES.flowSpeed * line.pace * (1 + LINES.acceleration * line.dist) * strength * dt
+		if line.dist > 1 then
+			spawnLine(line, 0)
+		end
+		local grown = LINES.lengthAtBirth + (1 - LINES.lengthAtBirth) * line.dist
+		local length = reach * LINES.length * grown * strength
+		local radius = inner + (reach - inner) * line.dist + length / 2
+		local frame = line.frame
+		frame.Position = UDim2.fromOffset(center.X + math.cos(line.angle) * radius, center.Y + math.sin(line.angle) * radius)
+		frame.Size = UDim2.fromOffset(length, line.thick * grown * strength)
+		frame.Rotation = math.deg(line.angle)
+		frame.BackgroundColor3 = if line.white then Ui.white else lineColor
+		local born = math.clamp(line.dist / LINES.birthFade, 0, 1)
+		-- a intensidade mexe em velocidade, comprimento e espessura; a opacidade só segue o fade
+		frame.BackgroundTransparency = 1 - LINES.maxOpacity * linesAlpha * born
 	end
 end
 
@@ -301,6 +360,8 @@ local function breakWall(index: number)
 	smashStart = os.clock()
 	smashRight = not smashRight
 	fovKick = 14
+	linesPulse = 1
+	linesPower = index / #Config.Walls
 	showPopup(Format.abbreviate(info.power) .. "!", color)
 	lineColor = color:Lerp(Ui.white, 0.35)
 	setNeon(color)
@@ -350,8 +411,8 @@ end
 
 local function beginCharge()
 	local _, root = character()
-	if state ~= "idle" or not root or not inZone(root) or Roll.isPlaying() then
-		return
+	if state ~= "idle" or not root or not inZone(root) or Roll.isPlaying() or Windows.current() then
+		return -- com um painel aberto a câmera é dele
 	end
 	state = "charging"
 	chargeStart = os.clock()
@@ -553,7 +614,7 @@ local function playRun(result: any)
 	Fx.shake(0.8)
 	camera.CameraType = Enum.CameraType.Scriptable
 	fovKick = 0
-	linesGui.Enabled = true
+	setLines(true)
 	distanceBar.Visible = true
 	multiplier.Text = "x1"
 	for _, stripe in stripes do
@@ -585,8 +646,6 @@ local function playRun(result: any)
 		local center = Vector3.new(position.X - weave * 0.6, position.Y, position.Z)
 		camera.CFrame = CFrame.lookAt(center + Vector3.new(0, 6.5, 17), center + Vector3.new(0, 3, -40)) * CFrame.Angles(0, 0, roll * 0.25) * Fx.shakeCFrame()
 
-		local viewport = camera.ViewportSize
-		showLines(Vector2.new(viewport.X / 2, viewport.Y * 0.44), viewport)
 		for i, stripe in stripes do
 			stripe.CFrame = CFrame.new(position.X + (if i == 1 then -1.7 else 1.7), Config.World.groundY + 0.2, position.Z + 33)
 		end
@@ -602,7 +661,7 @@ local function playRun(result: any)
 	end
 
 	-- fim: bate na parede que não quebra (ou chega ao fim do corredor)
-	linesGui.Enabled = false
+	setLines(false)
 	for _, stripe in stripes do
 		stripe.Transparency = 1
 	end
@@ -660,6 +719,10 @@ end
 function Run.isBusy(): boolean
 	return state ~= "idle"
 end
+
+-- O gancho de teste carrega e solta sem tecla.
+Run.beginCharge = beginCharge
+Run.releaseCharge = releaseCharge
 
 function Run.start()
 	local remotes = ReplicatedStorage:WaitForChild("Remotes")
@@ -728,12 +791,29 @@ function Run.start()
 		end
 	end)
 
+	-- botão CORRER do HUD: só pede; o servidor valida e decide o destino
+	local goRemote = remotes:WaitForChild("GoZone") :: RemoteEvent
+	local found = Hud.gui():FindFirstChild("GoZoneButton", true)
+	goButton = if found and found:IsA("GuiObject") then found else nil
+	Hud.onClick("GoZoneButton", function()
+		if state == "idle" and not Roll.isPlaying() then
+			goRemote:FireServer()
+		end
+	end)
+
 	RunService.RenderStepped:Connect(function(dt)
+		stepLines(dt)
+		local free = false -- parado fora da zona, sem carga, corrida ou roleta: pode teleportar
 		if state == "charging" or state == "waiting" then
 			stepCharge(os.clock(), dt)
 		elseif state == "idle" then
 			local _, root = character()
-			pill.Visible = root ~= nil and inZone(root) and not Roll.isPlaying()
+			local ready = root ~= nil and not Roll.isPlaying()
+			pill.Visible = ready and inZone(root :: BasePart)
+			free = ready and not inZone(root :: BasePart)
+		end
+		if goButton then
+			goButton.Visible = free
 		end
 	end)
 

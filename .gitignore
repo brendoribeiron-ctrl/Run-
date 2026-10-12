@@ -12,3 +12,6 @@ sourcemap.json
 
 # Rascunhos das imagens da página do jogo
 /art/_*.png
+
+# Chave do Open Cloud (nunca vai para o Git)
+.env

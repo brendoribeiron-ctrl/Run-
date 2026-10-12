@@ -50,6 +50,7 @@ local firstJumpAt = -10
 local usedDouble = false
 local dashStart = -10
 local dashInAir = false
+local dashPoseUntil = 0
 local skidUntil = 0
 local swayStart = -10
 local wasSprinting = false
@@ -95,6 +96,8 @@ local function dash()
 	dashUntil = now + MOVE.dashTime
 	dashReady = now + MOVE.dashCooldown
 	dashInAir = humanoid.FloorMaterial == Enum.Material.Air
+	-- a pose deitada dura até o giro acabar, mesmo que o empurrão termine antes (chão e ar)
+	dashPoseUntil = now + math.max(MOVE.dashTime, MOVE.dashRollTime)
 	ghostAt = 0
 	-- vira o corpo para a direção do dash na hora
 	root.CFrame = CFrame.lookAt(root.Position, root.Position + dashDirection)
@@ -163,10 +166,31 @@ local function doubleJump()
 	Fx.shake(0.15)
 end
 
+-- Troca a caminhada padrão pelo asset de Config.Move.walkAnimationId. No Animate atual a
+-- caminhada mistura "walk" e "run" pela velocidade, então os dois recebem o mesmo asset
+-- (a corrida de verdade é a camada "sprint", que cobre os dois).
+local CUSTOM_WALK = MOVE.walkAnimationId ~= ""
+local function applyWalkAnimation(character: Model)
+	local animate = character:WaitForChild("Animate", 10)
+	if not animate then
+		return
+	end
+	for holderName, animationName in { walk = "WalkAnim", run = "RunAnim" } do
+		local holder = animate:WaitForChild(holderName, 5)
+		local animation = holder and holder:FindFirstChild(animationName)
+		if animation and animation:IsA("Animation") then
+			animation.AnimationId = MOVE.walkAnimationId
+		end
+	end
+end
+
 local function onCharacter(character: Model)
 	local humanoid = character:WaitForChild("Humanoid", 10)
 	if not humanoid or not humanoid:IsA("Humanoid") then
 		return
+	end
+	if CUSTOM_WALK then
+		task.spawn(applyWalkAnimation, character)
 	end
 	usedDouble = false
 	humanoid.StateChanged:Connect(function(_, new)
@@ -208,6 +232,8 @@ local function touchButton()
 	gui.Parent = player:WaitForChild("PlayerGui")
 end
 
+Move.dash = dash -- o gancho de teste dispara o dash sem tecla
+
 function Move.start()
 	-- inclinação: soma na junta Root (corpo inteiro)
 	Pose.define("lean", { Root = CFrame.identity }, true, 30)
@@ -225,19 +251,22 @@ function Move.start()
 	-- balanço ao arrancar a corrida: soma no corpo inteiro, por cima do ciclo
 	Pose.define("sway", { Root = CFrame.identity }, true, 60)
 	Pose.weight("sway", 1, true)
-	-- dash no chão: mergulho esticado, um braço à frente e as pernas arrastando
+	-- dash no chão: voo deitado (Superman), um braço à frente, o outro colado ao corpo, pernas
+	-- juntas e esticadas. O parafuso entra na camada "flip", por cima desta.
 	Pose.define("dash", {
-		Root = CFrame.new(0, -0.5, 0) * Pose.deg(-66, 0, 0),
-		Waist = Pose.deg(-10, 0, 0),
-		Neck = Pose.deg(52, 0, 0),
-		RightShoulder = Pose.deg(168, 0, 6),
-		RightElbow = Pose.deg(4, 0, 0),
-		LeftShoulder = Pose.deg(-72, 0, -14),
-		LeftElbow = Pose.deg(8, 0, 0),
-		RightHip = Pose.deg(-18, 0, 4),
-		RightKnee = Pose.deg(-8, 0, 0),
-		LeftHip = Pose.deg(24, 0, -4),
-		LeftKnee = Pose.deg(-70, 0, 0),
+		Root = CFrame.new(0, -0.3, 0) * Pose.deg(-90, 0, 0),
+		Waist = Pose.deg(6, 0, 0),
+		Neck = Pose.deg(70, 0, 0),
+		RightShoulder = Pose.deg(178, 0, 4),
+		RightElbow = Pose.deg(0, 0, 0),
+		LeftShoulder = Pose.deg(-8, 0, -10),
+		LeftElbow = Pose.deg(6, 0, 0),
+		RightHip = Pose.deg(-6, 0, 3),
+		RightKnee = Pose.deg(-4, 0, 0),
+		LeftHip = Pose.deg(-6, 0, -3),
+		LeftKnee = Pose.deg(-4, 0, 0),
+		RightAnkle = Pose.deg(-30, 0, 0),
+		LeftAnkle = Pose.deg(-30, 0, 0),
 	}, false, 45)
 	-- fim do dash no chão: freada, corpo para trás, perna da frente esticada, braços abertos
 	Pose.define("skid", {
@@ -298,6 +327,7 @@ function Move.start()
 			sprintAlpha = 0
 			movingFor = 0
 			dashUntil = 0
+			dashPoseUntil = 0
 			wasSprinting = false
 			Pose.weight("sprint", 0)
 			Pose.weight("dash", 0)
@@ -337,15 +367,16 @@ function Move.start()
 			Aura.forceTrails(false)
 			-- no chão termina freando: poeira para a frente e pose de derrapagem
 			if grounded then
-				skidUntil = now + 0.26
+				skidUntil = math.max(now, dashPoseUntil) + 0.26
 				local feet = root.Position - Vector3.new(0, 2.8, 0)
 				Fx.cubes(feet + Vector3.new(0, 0.4, 0), DUST, 8, 9, dashDirection * 22 + Vector3.new(0, 7, 0), 0.6)
 				Fx.ring(feet, WHITE, 11, 0.3)
 			end
 		end
-		-- no ar o dash vira um parafuso (o giro entra na camada "flip")
-		Pose.weight("dash", if dashing and not dashInAir then 1 else 0)
-		Pose.weight("skid", if now < skidUntil and grounded and not dashing then 1 else 0)
+		-- o parafuso (no chão e no ar) entra na camada "flip"; a freada espera a pose deitada acabar
+		local flying = now < dashPoseUntil
+		Pose.weight("dash", if flying then 1 else 0)
+		Pose.weight("skid", if now < skidUntil and grounded and not dashing and not flying then 1 else 0)
 
 		local wantSprint = moving and (UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) or movingFor > AUTO_SPRINT_AFTER)
 		sprintAlpha += ((if wantSprint then 1 else 0) - sprintAlpha) * (1 - math.exp(-6 * dt))
@@ -367,7 +398,8 @@ function Move.start()
 		Pose.define("lean", { Root = CFrame.Angles(-math.rad(7) * frac * (1 - sprintAlpha), 0, bank) })
 		runPhase += speed * dt * 0.42
 		Pose.define("sprint", Pose.runCycle(runPhase, 0.85 + 0.15 * frac, 18, true))
-		Pose.weight("walkArms", if moving and grounded and sprintAlpha < 0.5 and not dashing then 1 else 0)
+		-- com asset próprio de caminhada os braços já vêm na animação
+		Pose.weight("walkArms", if not CUSTOM_WALK and moving and grounded and sprintAlpha < 0.5 and not dashing then 1 else 0)
 
 		-- balanço ao arrancar a corrida: mergulho para a frente e um vai-e-vem que morre em ~0,7 s
 		local sprinting = sprintAlpha > 0.5
@@ -391,10 +423,11 @@ function Move.start()
 			spin = CFrame.Angles(-math.pi * 2 * eased, 0, 0)
 		end
 		Pose.weight("tuck", if flip > 0.06 and flip < 0.78 then 1 else 0)
-		-- dash no ar: parafuso em volta do eixo do corpo
-		if dashInAir and now - dashStart < MOVE.dashTime * 2.2 then
-			local roll = (now - dashStart) / (MOVE.dashTime * 2.2)
-			spin *= CFrame.Angles(math.rad(-40) * math.sin(roll * math.pi), 0, math.pi * 2 * roll)
+		-- giro do dash (chão e ar). O corpo está deitado: na junta Root, Z aponta para cima do
+		-- mundo (giro "flat", de hélice) e Y é o comprimento do corpo (giro "barrel", de parafuso).
+		if flying then
+			local turn = math.pi * 2 * MOVE.dashRollTurns * math.clamp((now - dashStart) / MOVE.dashRollTime, 0, 1)
+			spin *= if MOVE.dashRollStyle == "barrel" then CFrame.Angles(0, turn, 0) else CFrame.Angles(0, 0, turn)
 		end
 		Pose.define("flip", { Root = spin })
 
