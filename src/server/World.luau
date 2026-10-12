@@ -218,6 +218,59 @@ function World.buildLobby(): Folder
 	return lobby
 end
 
+-- Fecha o mapa: chão de grama que continua para fora dos muros (nada de vazio à vista) e
+-- paredes invisíveis altas em cima dos muros do gramado e do corredor (ninguém sobe neles
+-- nem sai do mapa).
+function World.buildBounds(): Folder
+	local run = Config.Run
+	local bounds = Instance.new("Folder")
+	bounds.Name = "Bounds"
+
+	-- chão de fora: quatro placas grandes, um pouco abaixo do gramado
+	local quarter = W.outlandSize / 2
+	for _, corner in { Vector2.new(-1, -1), Vector2.new(1, -1), Vector2.new(-1, 1), Vector2.new(1, 1) } do
+		part(bounds, {
+			name = "Outland",
+			size = Vector3.new(quarter, 4, quarter),
+			cframe = CFrame.new(corner.X * quarter / 2, G - 2.6, corner.Y * quarter / 2),
+			color = Color3.fromRGB(58, 172, 40),
+			material = Enum.Material.Grass,
+		})
+	end
+
+	local height = W.boundsHeight
+	local function barrier(size: Vector3, position: Vector3)
+		local wall = part(bounds, { name = "Barrier", size = size, cframe = CFrame.new(position), color = Color3.new(1, 1, 1), transparency = 1 })
+		wall.CastShadow = false
+	end
+
+	-- gramado: em cima dos quatro muros, do topo deles para cima (mais largo que o muro, para
+	-- não sobrar beirada onde ficar em pé)
+	local sx, sz = W.lawnSize.X, W.lawnSize.Y
+	local tall = height - W.perimeterHeight
+	local y = G + W.perimeterHeight + tall / 2
+	local gap = run.hallwayWidth / 2 -- abertura do portão do corredor
+	barrier(Vector3.new(sx + 20, tall, 10), Vector3.new(0, y, sz / 2 + 3))
+	barrier(Vector3.new(10, tall, sz + 20), Vector3.new(sx / 2 + 3, y, 0))
+	barrier(Vector3.new(10, tall, sz + 20), Vector3.new(-sx / 2 - 3, y, 0))
+	local sideLength = sx / 2 + 10 - gap
+	for _, side in { -1, 1 } do
+		barrier(Vector3.new(sideLength, tall, 10), Vector3.new(side * (gap + sideLength / 2), y, -sz / 2 - 3))
+	end
+
+	-- corredor: em cima dos muros laterais e do muro do fim
+	local lawnEdge = -sz / 2
+	local endZ = run.zoneCenter.Z - Config.Walls[#Config.Walls].distance / run.metersPerStud - run.endPadding
+	local length = lawnEdge - endZ
+	for _, side in { -1, 1 } do
+		barrier(Vector3.new(8, height - run.wallHeight, length), Vector3.new(side * (gap + 4), G + run.wallHeight + (height - run.wallHeight) / 2, (lawnEdge + endZ) / 2))
+	end
+	barrier(Vector3.new(run.hallwayWidth + 16, height - run.wallHeight, 8), Vector3.new(0, G + run.wallHeight + (height - run.wallHeight) / 2, endZ - 3))
+
+	bounds.Parent = workspace
+	return bounds
+end
+
 -- Zona de carga, portão e o corredor com as paredes pré-fraturadas.
 function World.buildHallway(): Folder
 	local run = Config.Run
@@ -303,7 +356,7 @@ function World.buildHallway(): Folder
 	boardGui.Parent = board
 
 	-- piso em xadrez, muros laterais e faixas de neon nas bordas
-	part(hallway, { name = "Floor", size = Vector3.new(width, 0.25, length), cframe = CFrame.new(0, G - 0.125, midZ), color = P.grassLight })
+	part(hallway, { name = "Floor", size = Vector3.new(width, 0.25, length), cframe = CFrame.new(0, G - 0.125, midZ), color = Color3.fromRGB(52, 62, 160), material = Enum.Material.Slate })
 	local tiles = Instance.new("Folder")
 	tiles.Name = "Checker"
 	tiles.Parent = hallway
@@ -314,7 +367,8 @@ function World.buildHallway(): Folder
 					name = "Tile",
 					size = Vector3.new(W.tile, 0.05, W.tile),
 					cframe = CFrame.new(-width / 2 + (ix + 0.5) * W.tile, G + 0.025, lawnEdge - (iz + 0.5) * W.tile),
-					color = P.grassDark,
+					color = Color3.fromRGB(74, 88, 205),
+					material = Enum.Material.Slate,
 					collide = false,
 				})
 			end
@@ -329,16 +383,17 @@ function World.buildHallway(): Folder
 		for _, side in { -1, 1 } do
 			part(hallway, {
 				name = "SideWall",
-				size = Vector3.new(6, 16, segment),
-				cframe = CFrame.new(side * (width / 2 + 3), G + 8, z),
-				color = if i % 2 == 0 then P.wallBrown else P.wallOrange,
+				size = Vector3.new(6, run.wallHeight, segment),
+				cframe = CFrame.new(side * (width / 2 + 3), G + run.wallHeight / 2, z),
+				color = if i % 2 == 0 then Color3.fromRGB(58, 68, 170) else Color3.fromRGB(70, 82, 196),
+				material = Enum.Material.Slate,
 			})
 		end
 	end
 	for _, side in { -1, 1 } do
-		part(hallway, { name = "SideCap", size = Vector3.new(7, 1, length), cframe = CFrame.new(side * (width / 2 + 3), G + 16.5, midZ), color = P.grassDark })
+		part(hallway, { name = "SideCap", size = Vector3.new(7, 1, length), cframe = CFrame.new(side * (width / 2 + 3), G + run.wallHeight + 0.5, midZ), color = Color3.fromRGB(22, 24, 72), material = Enum.Material.Slate })
 	end
-	part(hallway, { name = "EndWall", size = Vector3.new(width + 12, 30, 6), cframe = CFrame.new(0, G + 15, endZ - 3), color = P.wallBrown })
+	part(hallway, { name = "EndWall", size = Vector3.new(width + 12, run.wallHeight, 6), cframe = CFrame.new(0, G + run.wallHeight / 2, endZ - 3), color = Color3.fromRGB(40, 46, 122), material = Enum.Material.Slate })
 
 	local neon = Instance.new("Folder")
 	neon.Name = "Neon"

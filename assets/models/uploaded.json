@@ -1,0 +1,58 @@
+{
+	"grass_tuft": {
+		"assetId": "123587998646580",
+		"hash": "2b42c765535f150d6be9a1861a14075d260a4a9f"
+	},
+	"bush": {
+		"assetId": "83178130107430",
+		"hash": "65fde6a05126dad74a36f9990c4d8fec84426841"
+	},
+	"crystal": {
+		"assetId": "76126776322422",
+		"hash": "962b8e0b2a28c041f216feb123b088e213c72f11"
+	},
+	"fence": {
+		"assetId": "134403172003232",
+		"hash": "32e8a298ca3cd2ac51f6d3c21f83e1b73844d26f"
+	},
+	"flowers": {
+		"assetId": "137324446385705",
+		"hash": "ef361ba9a8f5d93054dd763ad4a7e3fd0ceb4c00"
+	},
+	"hill": {
+		"assetId": "110274012459677",
+		"hash": "f75600779035bfa2fe720413b4ebf45ad0b7c455"
+	},
+	"lamp": {
+		"assetId": "84916477127163",
+		"hash": "f00b0662abfb5510c44a75305639b668dc95677d"
+	},
+	"mushroom_big": {
+		"assetId": "72099154437108",
+		"hash": "a98fe9158770c306a6dcdf6e41e0d39b9cd4c260"
+	},
+	"mushroom_cluster": {
+		"assetId": "133895331862562",
+		"hash": "655a1cfcbafc622a290c193153b101c96e6fc39e"
+	},
+	"rock_a": {
+		"assetId": "80812407221814",
+		"hash": "31b6a20dd70022e99c8c48863d805aa0ce554e9b"
+	},
+	"rock_b": {
+		"assetId": "140444395638051",
+		"hash": "09dc79ced42337a1a6b2171df7438c09cd7fecda"
+	},
+	"stump": {
+		"assetId": "76821366669982",
+		"hash": "12b804dbb208f7d5b6c3ed22523558b98fc4c1f6"
+	},
+	"tree_pine": {
+		"assetId": "92430414217434",
+		"hash": "cdc01706ad98011a6496a33b6303b3221a66cc9e"
+	},
+	"tree_round": {
+		"assetId": "73502784621556",
+		"hash": "fd9656ffd9d3645560725efc19a816afaf2f59e5"
+	}
+}

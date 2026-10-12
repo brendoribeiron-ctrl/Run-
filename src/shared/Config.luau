@@ -64,6 +64,9 @@ Config.World = {
 	plotSpacing = 72,
 	plotRowZ = 100, -- centro da fileira de terrenos; o portão do corredor fica em -Z
 	perimeterHeight = 12,
+	boundsHeight = 400, -- altura das paredes invisíveis que fecham o gramado e o corredor
+	outlandSize = 4096, -- lado do chão de grama que continua para fora dos muros (até o horizonte)
+	fallY = -40, -- quem cair abaixo disto volta para o próprio terreno
 }
 
 -- Posições dentro do terreno, relativas ao centro dele (-Z aponta para o gramado).
@@ -93,6 +96,7 @@ Config.Run = {
 	minCharge = 0.15, -- soltar antes disso cancela
 	endPadding = 60, -- studs de corredor depois da última parede
 	returnDelay = 1.4, -- segundos entre o fim da corrida e a volta ao terreno
+	wallHeight = 50, -- altura dos muros laterais e do fim do corredor (o teto fica em cima)
 	-- botão CORRER do HUD: teleporta para a zona de carga
 	teleportCooldown = 3, -- segundos entre dois teleportes do mesmo jogador
 	teleportOffset = Vector3.new(0, 4, 4), -- ponto de chegada, a partir de zoneCenter (de frente para o corredor)
@@ -197,6 +201,43 @@ Config.Super = {
 	cameraLinger = 0.45, -- acerto: segundos que a câmera de cinema ainda fica depois do golpe
 	latency = 0.3, -- servidor: folga de rede ao conferir se deu tempo de acertar
 	grace = 3, -- servidor: segundos além do fim da barra antes de desistir do cliente
+}
+
+-- Decoração do corredor (src/server/Hall.luau), estilo salão gótico azul e dourado. Um trecho
+-- se repete a cada `spacing` studs. AJUSTE AQUI.
+Config.Hall = {
+	spacing = 40, -- comprimento de cada trecho (um par de pilares e um arco por trecho)
+	firstOffset = 12, -- distância do portão até o primeiro arco
+	pillarOffset = 17.5, -- distância dos pilares ao centro do corredor
+	pillarHeight = 26,
+	archRise = 20, -- quanto o arco sobe acima do topo dos pilares
+	archSteps = 8, -- trechos retos em cada metade do arco
+	bannerOffset = 9, -- distância dos estandartes ao centro
+	bannerLength = 11,
+	bannerWidth = 3.4,
+	windowWidth = 4.6,
+	windowHeight = 12,
+	windowSill = 12, -- altura do peitoril das janelas
+	inlayWidth = 0.55, -- largura das linhas douradas do piso
+	lanternRange = 44,
+	lanternBrightness = 2.6,
+	windowRange = 30, -- luz azul que cada janela joga para dentro
+	windowBrightness = 1.6,
+}
+
+-- Cenário decorativo (src/server/Scenery.luau): quantos de cada coisa. A mesma semente dá
+-- sempre o mesmo mapa. AJUSTE AQUI.
+Config.Scenery = {
+	seed = 7,
+	hills = 34, -- colinas grandes atrás dos muros
+	farHills = 40, -- colinas enormes ao longe, fechando o horizonte
+	hallwayStep = 24, -- distância entre as árvores que acompanham o corredor dos dois lados
+	giantTrees = 70, -- árvores e pinheiros gigantes no fundo
+	giantMushrooms = 22, -- cogumelos gigantes no fundo
+	giantCrystals = 10, -- cristais gigantes no fundo
+	groves = 46, -- canteiros (árvore + pedras, arbustos, flores) nas bordas do gramado
+	tufts = 150, -- tufos de grama soltos pelo gramado
+	flowers = 60, -- canteirinhos de flores soltos pelo gramado
 }
 
 -- Painel 3D das janelas (estilo "painel do sistema"): flutua na frente do boneco, com a câmera

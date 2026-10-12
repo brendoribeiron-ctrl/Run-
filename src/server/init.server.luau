@@ -10,9 +10,11 @@ local ServerStorage = game:GetService("ServerStorage")
 local Config = require(ReplicatedStorage.Shared.Config)
 local Format = require(ReplicatedStorage.Shared.Format)
 local RunMath = require(ReplicatedStorage.Shared.RunMath)
+local Hall = require(script.Hall)
 local Pedestals = require(script.Pedestals)
 local PlayerData = require(script.PlayerData)
 local Run = require(script.Run)
+local Scenery = require(script.Scenery)
 local State = require(script.State)
 local World = require(script.World)
 
@@ -28,7 +30,10 @@ local remotes = State.remotes
 
 World.setupLighting()
 World.buildLobby()
-World.buildHallway()
+Hall.build(World.buildHallway())
+World.buildBounds()
+-- os modelos vêm da Roblox (uma chamada por modelo): monta em paralelo, sem segurar o servidor
+task.spawn(Scenery.build)
 
 local plotsFolder = Instance.new("Folder")
 plotsFolder.Name = "Plots"
@@ -530,6 +535,22 @@ local function goZone(player: Player): boolean
 	return true
 end
 remotes.GoZone.OnServerEvent:Connect(goZone)
+
+-- Rede de segurança: quem cair para fora do mapa volta para o próprio terreno.
+task.spawn(function()
+	while true do
+		task.wait(1)
+		for _, player in Players:GetPlayers() do
+			local root = State.root(player)
+			local plot = State.plot(player)
+			local character = player.Character
+			if root and plot and character and root.Position.Y < Config.World.fallY then
+				root.AssemblyLinearVelocity = Vector3.zero
+				character:PivotTo(State.spawnCFrame(plot))
+			end
+		end
+	end
+end)
 
 Run.connect()
 Pedestals.connect()
