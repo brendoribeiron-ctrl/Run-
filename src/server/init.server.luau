@@ -540,9 +540,13 @@ for _, player in Players:GetPlayers() do
 	task.spawn(onPlayerAdded, player)
 end
 
--- Dá um de cada personagem (inventário e índice), dinheiro e Poder no máximo.
+-- Dá um de cada personagem (inventário e índice), todas as auras (pelo Poder), skills no
+-- máximo, dinheiro e Poder.
 -- Só para teste: nunca é ligado fora do Studio.
 local GIVEALL_POWER = 10_000_000 -- quebra a última parede (3M) até com carga mínima
+for _, aura in Config.Auras do
+	GIVEALL_POWER = math.max(GIVEALL_POWER, aura.power) -- e libera todas as auras
+end
 local GIVEALL_MONEY = 1_000_000_000_000
 
 local function giveAll(player: Player): number
@@ -553,6 +557,10 @@ local function giveAll(player: Player): number
 	PlayerData.update(player, function(p)
 		p.power = math.max(p.power, GIVEALL_POWER)
 		p.money = math.max(p.money, GIVEALL_MONEY)
+		-- skills (atributos do painel SKILLS) no nível máximo
+		for name, stat in Config.Stats do
+			p.stats[name] = stat.max
+		end
 		table.clear(p.inventory)
 		for _, info in Config.Characters do
 			if #p.inventory < Config.Inventory.maxItems then
@@ -575,7 +583,7 @@ if RunService:IsStudio() then
 		local player = Players:GetPlayerByUserId(source.UserId)
 		if player then
 			local count = giveAll(player)
-			remotes.Fx:FireClient(player, "toast", `GIVEALL: {count} characters, max money and power!`)
+			remotes.Fx:FireClient(player, "toast", `GIVEALL: {count} characters, all auras, max skills, money and power!`)
 		end
 	end)
 	command.Parent = game:GetService("TextChatService")

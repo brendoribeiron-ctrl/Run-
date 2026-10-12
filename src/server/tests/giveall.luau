@@ -1,4 +1,4 @@
--- Dá um de cada personagem, dinheiro e Poder no máximo ao primeiro jogador
+-- Dá um de cada personagem, todas as auras, skills no máximo, dinheiro e Poder ao primeiro jogador
 -- (o mesmo que digitar /giveall no chat, no Studio).
 --   node tools/bridge.cjs run server src/server/tests/giveall.luau
 
@@ -18,5 +18,13 @@ for _, info in Config.Characters do
 	assert(state.index[info.id] == true, "índice sem " .. info.id)
 end
 assert(state.power >= 10_000_000, "poder não foi ao máximo: " .. tostring(state.power))
+for _, aura in Config.Auras do
+	assert(state.power >= aura.power, "aura trancada: " .. aura.id)
+	assert(hook:Invoke("auraEquip", player, aura.id) == true, "não equipou " .. aura.id)
+end
+hook:Invoke("auraEquip", player, Config.Auras[1].id)
+for name, stat in Config.Stats do
+	assert(state.stats[name] == stat.max and player:GetAttribute("Stat_" .. name) == stat.max, "skill abaixo do máximo: " .. name)
+end
 assert(state.money >= 1_000_000_000_000, "dinheiro não foi ao máximo: " .. tostring(state.money))
-return `{count} personagens no inventário, índice completo, Poder {state.power}, dinheiro {state.money}`
+return `{count} personagens no inventário, índice completo, {#Config.Auras} auras liberadas, skills no máximo, Poder {state.power}, dinheiro {state.money}`
