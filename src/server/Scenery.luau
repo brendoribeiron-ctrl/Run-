@@ -162,7 +162,23 @@ local function groundAt(x: number, z: number): number
 	return ground
 end
 
-local function addHill(x: number, z: number, scale: number)
+-- Distância de um ponto de fora até o gramado ou o corredor (o que estiver mais perto).
+local function clearance(x: number, z: number): number
+	local lawnX, lawnZ = W.lawnSize.X / 2 + 6, W.lawnSize.Y / 2 + 6
+	local toLawn = math.sqrt(math.max(math.abs(x) - lawnX, 0) ^ 2 + math.max(math.abs(z) - lawnZ, 0) ^ 2)
+	if z < -lawnZ then
+		-- ao lado do corredor, que segue para -Z (muro de 6 de espessura)
+		return math.min(toLawn, math.abs(x) - (Config.Run.hallwayWidth / 2 + 6))
+	end
+	return toLawn
+end
+
+local function addHill(x: number, z: number, wanted: number)
+	-- a colina não pode entrar no gramado nem no corredor: encolhe até caber, ou não é colocada
+	local scale = math.min(wanted, clearance(x, z) / 6.2)
+	if scale < 2.5 then
+		return
+	end
 	if place("hill", x, G - 3, z, scale) then
 		-- medidas do modelo: 6 de raio e 3,2 de altura por unidade de escala
 		table.insert(hills, { x = x, z = z, radius = 6 * scale, height = 3.2 * scale })
@@ -232,7 +248,7 @@ local function hallwaySides()
 			if rng:NextNumber() < 0.35 then
 				addHill(side * (gate + rng:NextNumber(70, 140)), z, rng:NextNumber(7, 12))
 			end
-			local x = side * (gate + rng:NextNumber(14, 44))
+			local x = side * (gate + rng:NextNumber(22, 50))
 			local name = pick({ "tree_round", "tree_pine", "tree_pine", "mushroom_big" })
 			place(name, x, groundAt(x, z) - 1.5, z + rng:NextNumber(-8, 8), rng:NextNumber(6, 10))
 		end

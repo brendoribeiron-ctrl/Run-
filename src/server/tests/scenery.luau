@@ -35,6 +35,21 @@ for _, model in folder:GetChildren() do
 		end
 	end
 end
+-- nenhuma colina entra no gramado nem no corredor
+local invading = 0
+for _, model in folder:GetChildren() do
+	if model.Name == "hill" then
+		local center, size = model:GetBoundingBox()
+		local radius = math.max(size.X, size.Z) / 2
+		local x, z = center.Position.X, center.Position.Z
+		local toLawn = math.sqrt(math.max(math.abs(x) - W.lawnSize.X / 2, 0) ^ 2 + math.max(math.abs(z) - W.lawnSize.Y / 2, 0) ^ 2)
+		local toHall = if z < -W.lawnSize.Y / 2 then math.abs(x) - Config.Run.hallwayWidth / 2 else math.huge
+		if math.min(toLawn, toHall) < radius then
+			invading += 1
+		end
+	end
+end
+assert(invading == 0, invading .. " colinas entram no gramado ou no corredor")
 assert(#folder:GetChildren() > 300, "poucas peças no cenário: " .. #folder:GetChildren())
 assert(colliding == 0, colliding .. " peças colidem ou estão soltas")
 assert(inPlay == 0, inPlay .. " modelos dentro da zona de carga ou dos terrenos")
@@ -47,4 +62,4 @@ for name, count in counts do
 	table.insert(summary, name .. "=" .. count)
 end
 table.sort(summary)
-return `{#folder:GetChildren()} modelos, {parts} peças, nenhuma colide, nada nas áreas de jogo | ` .. table.concat(summary, " ")
+return `{#folder:GetChildren()} modelos, {parts} peças, nenhuma colide, nada nas áreas de jogo, nenhuma colina invade | ` .. table.concat(summary, " ")

@@ -343,7 +343,8 @@ function World.buildHallway(): Folder
 		part(hallway, { name = "GatePillar", size = Vector3.new(5, 26, 7), cframe = CFrame.new(side * (width / 2 + 2.5), G + 13, gateZ), color = P.navy })
 		part(hallway, { name = "GateBand", size = Vector3.new(5.4, 1.5, 6.4), cframe = CFrame.new(side * (width / 2 + 2.5), G + 6, gateZ), color = P.machineYellow })
 	end
-	local board = part(hallway, { name = "Billboard", size = Vector3.new(width + 10, 9, 1.5), cframe = CFrame.new(0, G + 24, gateZ), color = P.navy })
+	-- letreiro apoiado no topo dos pilares do portão (26 de altura)
+	local board = part(hallway, { name = "Billboard", size = Vector3.new(width + 10, 9, 1.5), cframe = CFrame.new(0, G + 26 + 4.5, gateZ), color = P.navy })
 	local boardGui = Instance.new("SurfaceGui")
 	boardGui.Face = Enum.NormalId.Back -- +Z, lado dos terrenos
 	boardGui.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud

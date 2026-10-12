@@ -206,8 +206,10 @@ Config.Super = {
 -- Decoração do corredor (src/server/Hall.luau), estilo salão gótico azul e dourado. Um trecho
 -- se repete a cada `spacing` studs. AJUSTE AQUI.
 Config.Hall = {
-	spacing = 40, -- comprimento de cada trecho (um par de pilares e um arco por trecho)
-	firstOffset = 12, -- distância do portão até o primeiro arco
+	spacing = 50, -- comprimento de cada trecho; igual ao passo das paredes quebráveis, para nunca coincidirem
+	archLead = 12.5, -- cada arco fica este tanto antes de onde pode haver uma parede quebrável
+	contentOffset = 31, -- do arco até o centro do desenho do piso e das janelas do trecho
+	inlayReach = 12, -- meia largura do desenho do piso
 	pillarOffset = 17.5, -- distância dos pilares ao centro do corredor
 	pillarHeight = 26,
 	archRise = 20, -- quanto o arco sobe acima do topo dos pilares

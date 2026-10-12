@@ -159,9 +159,9 @@ local function window(parent: Instance, x: number, z: number)
 end
 
 -- Desenho dourado no piso de um trecho: moldura, losango grande, losango pequeno e medalhão.
-local function inlay(parent: Instance, z: number, length: number)
+local function inlay(parent: Instance, z: number)
 	local y = G + 0.09
-	local reach = math.min(HALL.pillarOffset - 3, length / 2 - 2)
+	local reach = HALL.inlayReach
 	local line = HALL.inlayWidth
 	local function strip(center: Vector3, long: number, yaw: number, wide: number?)
 		piece(parent, "Trim", Vector3.new(long, 0.1, wide or line), CFrame.new(center) * CFrame.Angles(0, yaw, 0))
@@ -192,28 +192,16 @@ local function ceiling(parent: Instance, z: number, length: number, width: numbe
 	end
 end
 
--- Monta um trecho (pilares e arco em z = 0, o resto até z = -length) e o copia pelo corredor.
+-- Monta um trecho (pilares e arco em z = 0, janelas e desenho do piso mais adiante) e o copia
+-- pelo corredor. Os arcos ficam sempre um pouco antes de onde pode haver uma parede quebrável,
+-- e o resto do trecho depois dela: nada da decoração atravessa uma parede. A entrada, do
+-- portão até a primeira parede, fica limpa.
 function Hall.build(parent: Instance): number
 	local run = Config.Run
 	local lawnEdge = -Config.World.lawnSize.Y / 2
+	local firstWall = run.zoneCenter.Z - Config.Walls[1].distance / run.metersPerStud
 	local endZ = run.zoneCenter.Z - Config.Walls[#Config.Walls].distance / run.metersPerStud - run.endPadding
 	local length = HALL.spacing
-
-	local segment = Instance.new("Model")
-	segment.Name = "Segment"
-	for _, side in { -1, 1 } do
-		pillar(segment, side * HALL.pillarOffset)
-		lantern(segment, side * HALL.pillarOffset)
-		window(segment, side * run.hallwayWidth / 2, -length / 2)
-	end
-	local archHeight = arch(segment)
-	for _, side in { -1, 1 } do
-		local x = side * HALL.bannerOffset
-		banner(segment, x, G + HALL.pillarHeight + archHeight(x) - 1.2)
-	end
-	inlay(segment, -length / 2, length)
-	ceiling(segment, -length / 2, length, run.hallwayWidth)
-	segment.WorldPivot = CFrame.new(0, G, 0)
 
 	-- muros, tampa e fundo do corredor também deixam o sol passar
 	for _, child in parent:GetChildren() do
@@ -222,10 +210,28 @@ function Hall.build(parent: Instance): number
 		end
 	end
 
+	local segment = Instance.new("Model")
+	segment.Name = "Segment"
+	for _, side in { -1, 1 } do
+		pillar(segment, side * HALL.pillarOffset)
+		lantern(segment, side * HALL.pillarOffset)
+		window(segment, side * run.hallwayWidth / 2, -HALL.contentOffset)
+	end
+	local archHeight = arch(segment)
+	for _, side in { -1, 1 } do
+		local x = side * HALL.bannerOffset
+		banner(segment, x, G + HALL.pillarHeight + archHeight(x) - 1.2)
+	end
+	inlay(segment, -HALL.contentOffset)
+	ceiling(segment, -length / 2, length, run.hallwayWidth)
+	segment.WorldPivot = CFrame.new(0, G, 0)
+
 	local folder = Instance.new("Folder")
 	folder.Name = "Decor"
+	-- o primeiro arco vem depois da primeira parede
+	local first = firstWall + HALL.archLead - length
 	local count = 0
-	local z = lawnEdge - HALL.firstOffset
+	local z = first
 	while z - length > endZ - 4 do
 		local copy = segment:Clone()
 		copy:PivotTo(CFrame.new(0, G, z))
@@ -234,6 +240,17 @@ function Hall.build(parent: Instance): number
 		z -= length
 	end
 	segment:Destroy()
+
+	-- teto do trecho de entrada e do resto até o muro do fim
+	local caps = Instance.new("Model")
+	caps.Name = "Caps"
+	local entrance = lawnEdge - 6
+	ceiling(caps, (entrance + first) / 2, entrance - first, run.hallwayWidth)
+	if z > endZ then
+		ceiling(caps, (z + endZ) / 2, z - endZ, run.hallwayWidth)
+	end
+	caps.Parent = folder
+
 	folder.Parent = parent
 	return count
 end
