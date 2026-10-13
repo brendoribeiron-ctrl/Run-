@@ -133,7 +133,7 @@ end
 -- Fantasma: cópia de neon das peças do personagem que some (rastro de dash).
 function Fx.ghost(character: Model, color: Color3, time: number?)
 	for _, piece in character:GetChildren() do
-		if piece:IsA("BasePart") and piece.Transparency < 1 and piece.Name ~= "HumanoidRootPart" and piece.Name ~= "AuraBase" then
+		if piece:IsA("BasePart") and piece.Transparency < 1 and piece.Name ~= "HumanoidRootPart" and piece.Name ~= "AuraBase" and piece.Name ~= "AuraFeet" then
 			local copy = Fx.part(piece.Size, piece.CFrame, color, Enum.Material.Neon)
 			copy.Transparency = 0.45
 			local tween = TweenService:Create(copy, ease(time or 0.35), { Transparency = 1 })

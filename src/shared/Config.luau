@@ -472,6 +472,7 @@ Config.AuraFx = {
 	arcLength = 1.5, -- comprimento de cada arco, em radianos (1,57 = um quarto de volta)
 	arcWidth = 1.0, -- largura do arco no ponto mais gordo, em studs
 	haloSpin = 9, -- giro do ponto que desenha o anel fino de fora
+	flameRate = 38, -- labaredas subindo por segundo, com a aura inteira (a carga soma mais)
 }
 
 Config.AuraById = {}

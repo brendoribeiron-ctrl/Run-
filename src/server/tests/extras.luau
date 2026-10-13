@@ -56,6 +56,7 @@ hook:Invoke("set", player, { power = Config.AuraFx.fullPower })
 task.wait(0.3)
 local strong = ui("auraState")
 check("a aura cresce com o Poder", strong.strength > 0.99 and strong.rate > weak.rate * 2, `{weak.rate} -> {strong.rate}`)
+check("a aura exala energia", strong.flames and strong.pool and strong.hands == 2 and strong.flameRate > weak.flameRate * 2, `labaredas {weak.flameRate} -> {strong.flameRate}, mãos {strong.hands}`)
 check("a primeira aura tem um anel de arcos", weak.arcs == 2 and strong.arcs == 2 and not strong.halo, `{weak.arcs} / {strong.arcs}`)
 -- cada aura tem o próprio desenho: mais anéis, anel de fora e o efeito extra dela
 local seen = {}

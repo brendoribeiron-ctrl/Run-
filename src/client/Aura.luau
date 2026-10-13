@@ -1,8 +1,10 @@
 --!strict
 -- Aura estilo "spin": arcos de luz em meia-lua girando em volta do boneco em anéis inclinados,
 -- um anel fino de luz por fora, estrelinhas piscando, poeira brilhante e um brilho suave no
--- corpo. Nada de fogo nem fumaça. Cada aura de Config.Auras tem o próprio desenho (quantos
--- anéis, velocidade, cor de destaque e um efeito extra: neve, bolhas, raios, clarões, vazio).
+-- corpo. Por baixo disso, a energia que o boneco exala: labaredas coloridas subindo do chão
+-- com uma sombra escura atrás, chama nas duas mãos, riscos de luz subindo e uma poça de luz no
+-- chão. Cada aura de Config.Auras tem o próprio desenho (quantos anéis, velocidade, cor de
+-- destaque e um efeito extra: neve, bolhas, raios, clarões, vazio).
 --
 -- Os arcos são Trails: dois pontos giram num círculo e a trilha que deixam vira a meia-lua.
 -- A força (Aura.strength) cresce com o Poder: aura fraca tem poucos arcos, finos e apagados.
@@ -27,6 +29,7 @@ local WHITE = Color3.new(1, 1, 1)
 local BASE_COLOR = Color3.fromRGB(255, 120, 20) -- antes do segundo tier
 local SPARK = "rbxasset://textures/particles/sparkles_main.dds"
 local SMOKE = "rbxasset://textures/particles/smoke_main.dds"
+local FIRE = "rbxasset://textures/particles/fire_main.dds"
 local FX = Config.AuraFx
 local MAX_RINGS = 4
 -- inclinação de cada anel (graus em X e Z), altura do centro e sentido do giro
@@ -48,6 +51,11 @@ type State = {
 	halo: Blade?,
 	stars: ParticleEmitter?,
 	motes: ParticleEmitter?,
+	flames: ParticleEmitter?, -- labaredas coloridas subindo
+	shade: ParticleEmitter?, -- sombra escura atrás das labaredas
+	streaks: ParticleEmitter?, -- riscos finos de luz subindo
+	pool: ParticleEmitter?, -- poça de luz deitada no chão
+	hands: { ParticleEmitter }, -- chama em cada mão
 	extra: ParticleEmitter?,
 	extraKind: string?,
 	light: PointLight?,
@@ -69,7 +77,7 @@ local rng = Random.new()
 local function stateOf(player: Player): State
 	local state = states[player]
 	if not state then
-		state = { player = player, blades = {}, trails = {}, forcedTrails = false, boost = 0, sprint = 0, angle = 0, nextArc = 0, hidden = false } :: State
+		state = { player = player, blades = {}, trails = {}, hands = {}, forcedTrails = false, boost = 0, sprint = 0, angle = 0, nextArc = 0, hidden = false } :: State
 		states[player] = state
 	end
 	return state
@@ -212,6 +220,41 @@ local function apply(state: State)
 		halo.trail.Brightness = 1.4 + boost * 3
 	end
 
+	-- energia exalando: labaredas, sombra, riscos, poça no chão e mãos acesas
+	local big = 0.45 + 0.55 * k
+	local dark = color:Lerp(Color3.new(0, 0, 0), 0.86)
+	local flames, shade, streaks, pool = state.flames, state.shade, state.streaks, state.pool
+	if flames then
+		flames.Color = ColorSequence.new({ ColorSequenceKeypoint.new(0, accent), ColorSequenceKeypoint.new(0.3, color), ColorSequenceKeypoint.new(1, color:Lerp(Color3.new(0, 0, 0), 0.4)) })
+		flames.Rate = (FX.flameRate + boost * 90) * many
+		flames.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 1.6 * big), NumberSequenceKeypoint.new(0.3, (3.2 + boost * 3) * big), NumberSequenceKeypoint.new(1, 0.4 * big) })
+		flames.Speed = NumberRange.new(6 + boost * 10, 11 + boost * 16)
+		flames.Enabled = on
+	end
+	if shade then
+		shade.Color = ColorSequence.new(dark)
+		shade.Rate = (FX.flameRate * 0.5 + boost * 40) * many
+		shade.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 2.2 * big), NumberSequenceKeypoint.new(0.3, (4.4 + boost * 3.5) * big), NumberSequenceKeypoint.new(1, 0.6 * big) })
+		shade.Enabled = on and k > 0.3
+	end
+	if streaks then
+		streaks.Color = ColorSequence.new(accent, color)
+		streaks.Rate = (10 + boost * 50) * many
+		streaks.Enabled = on
+	end
+	if pool then
+		pool.Color = ColorSequence.new(color)
+		pool.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, (9 + boost * 6) * big), NumberSequenceKeypoint.new(1, (13 + boost * 8) * big) })
+		pool.Rate = 5
+		pool.Enabled = on
+	end
+	for _, hand in state.hands do
+		hand.Color = ColorSequence.new({ ColorSequenceKeypoint.new(0, WHITE), ColorSequenceKeypoint.new(0.3, accent), ColorSequenceKeypoint.new(1, color) })
+		hand.Rate = (26 + boost * 50) * many
+		hand.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.5 * big), NumberSequenceKeypoint.new(0.3, 1.25 * big), NumberSequenceKeypoint.new(1, 0.1) })
+		hand.Enabled = on and k > 0.3
+	end
+
 	local stars, motes, extra, light, outline = state.stars, state.motes, state.extra, state.light, state.outline
 	if stars then
 		stars.Color = ColorSequence.new(accent, color)
@@ -236,15 +279,15 @@ local function apply(state: State)
 	end
 	if light then
 		light.Color = color
-		light.Brightness = (1.1 + boost * 4) * many
-		light.Range = 10 + 6 * k + boost * 12
+		light.Brightness = (2 + boost * 5) * many
+		light.Range = 12 + 10 * k + boost * 14
 		light.Enabled = on
 	end
 	if outline then
 		outline.OutlineColor = accent
 		outline.FillColor = color
-		outline.FillTransparency = 1 - (0.12 + boost * 0.28) * k
-		outline.OutlineTransparency = 0.75 - 0.6 * k
+		outline.FillTransparency = 1 - (0.3 + boost * 0.3) * k -- o corpo inteiro fica tingido de luz
+		outline.OutlineTransparency = 0.6 - 0.6 * k
 		outline.Enabled = on
 	end
 	for _, t in state.trails do
@@ -261,10 +304,13 @@ function Aura.setHidden(on: boolean)
 	end
 	me.hidden = on
 	if on then
-		for _, particles in { me.stars, me.motes, me.extra } do
+		for _, particles in { me.stars, me.motes, me.extra, me.flames, me.shade, me.streaks, me.pool } do
 			if particles then
 				particles:Clear()
 			end
+		end
+		for _, hand in me.hands do
+			hand:Clear()
 		end
 	end
 	apply(me)
@@ -404,6 +450,106 @@ local function attach(state: State, character: Model)
 	local x = emitter(base, "Extra", SPARK)
 	state.extra = x
 	state.extraKind = nil
+
+	-- base nos pés: as labaredas nascem numa caixa baixa e sobem
+	local feet = Instance.new("Part")
+	feet.Name = "AuraFeet"
+	feet.Size = Vector3.new(3.6, 0.4, 3)
+	feet.Transparency = 1
+	feet.CanCollide = false
+	feet.CanQuery = false
+	feet.CanTouch = false
+	feet.Massless = true
+	feet.CFrame = root.CFrame * CFrame.new(0, -2.7, 0)
+	local feetWeld = Instance.new("WeldConstraint")
+	feetWeld.Part0 = root
+	feetWeld.Part1 = feet
+	feetWeld.Parent = feet
+	feet.Parent = character
+	local function rising(name: string, texture: string): ParticleEmitter
+		local e = Instance.new("ParticleEmitter")
+		e.Name = name
+		e.Texture = texture
+		e.LightInfluence = 0
+		e.EmissionDirection = Enum.NormalId.Top
+		e.Shape = Enum.ParticleEmitterShape.Box
+		e.ShapeStyle = Enum.ParticleEmitterShapeStyle.Volume
+		e.LockedToPart = false
+		e.Enabled = false
+		e.Parent = feet
+		return e
+	end
+	local shade = rising("Shade", FIRE)
+	shade.LightEmission = 0
+	shade.ZOffset = -1.6
+	shade.Lifetime = NumberRange.new(0.6, 1)
+	shade.Speed = NumberRange.new(6, 10)
+	shade.SpreadAngle = Vector2.new(18, 18)
+	shade.Rotation = NumberRange.new(-30, 30)
+	shade.RotSpeed = NumberRange.new(-50, 50)
+	shade.Squash = NumberSequence.new(0.4)
+	shade.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.7), NumberSequenceKeypoint.new(0.5, 0.8), NumberSequenceKeypoint.new(1, 1) })
+	state.shade = shade
+	local flames = rising("Flames", FIRE)
+	flames.LightEmission = 0.8
+	flames.Brightness = 3
+	flames.ZOffset = -0.6
+	flames.Lifetime = NumberRange.new(0.5, 0.95)
+	flames.SpreadAngle = Vector2.new(12, 12)
+	flames.Rotation = NumberRange.new(-20, 20)
+	flames.RotSpeed = NumberRange.new(-40, 40)
+	flames.Squash = NumberSequence.new(0.65) -- estica na vertical: labaredas altas
+	flames.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.25), NumberSequenceKeypoint.new(0.6, 0.45), NumberSequenceKeypoint.new(1, 1) })
+	state.flames = flames
+	-- riscos de luz: faíscas muito esticadas subindo rápido
+	local streaks = rising("Streaks", SPARK)
+	streaks.LightEmission = 0.9
+	streaks.Brightness = 3
+	streaks.Lifetime = NumberRange.new(0.35, 0.7)
+	streaks.Speed = NumberRange.new(14, 24)
+	streaks.SpreadAngle = Vector2.new(6, 6)
+	streaks.Squash = NumberSequence.new(2.6)
+	streaks.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.5), NumberSequenceKeypoint.new(1, 0) })
+	state.streaks = streaks
+	-- poça de luz: partículas grandes e moles deitadas no chão, quase paradas
+	local pool = rising("Pool", SMOKE)
+	pool.Orientation = Enum.ParticleOrientation.VelocityPerpendicular
+	pool.LightEmission = 0.9
+	pool.Brightness = 2
+	pool.ZOffset = -2
+	pool.Lifetime = NumberRange.new(0.9, 1.3)
+	pool.Speed = NumberRange.new(0.01, 0.01)
+	pool.Rotation = NumberRange.new(0, 360)
+	pool.RotSpeed = NumberRange.new(-20, 20)
+	pool.LockedToPart = true
+	pool.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 1), NumberSequenceKeypoint.new(0.3, 0.55), NumberSequenceKeypoint.new(1, 1) })
+	state.pool = pool
+	-- chama nas mãos
+	table.clear(state.hands)
+	task.spawn(function()
+		for _, name in { "RightHand", "LeftHand" } do
+			local hand = character:WaitForChild(name, 5)
+			if hand and hand:IsA("BasePart") then
+				local e = Instance.new("ParticleEmitter")
+				e.Name = "AuraHand"
+				e.Texture = FIRE
+				e.LightInfluence = 0
+				e.LightEmission = 0.9
+				e.Brightness = 4
+				e.Lifetime = NumberRange.new(0.25, 0.5)
+				e.Speed = NumberRange.new(2, 4.5)
+				e.SpreadAngle = Vector2.new(25, 25)
+				e.EmissionDirection = Enum.NormalId.Top
+				e.Rotation = NumberRange.new(-30, 30)
+				e.Squash = NumberSequence.new(0.4)
+				e.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.1), NumberSequenceKeypoint.new(1, 1) })
+				e.Enabled = false
+				e.Parent = hand
+				table.insert(state.hands, e)
+			end
+		end
+		apply(state)
+	end)
 
 	local l = Instance.new("PointLight")
 	l.Name = "AuraLight"
@@ -583,6 +729,10 @@ function Aura.debug(): { [string]: any }
 		emitting = me.stars ~= nil and me.stars.Enabled,
 		rate = if me.stars then me.stars.Rate else 0,
 		lit = me.light ~= nil and me.light.Enabled,
+		flames = me.flames ~= nil and me.flames.Enabled,
+		flameRate = if me.flames then me.flames.Rate else 0,
+		hands = #me.hands,
+		pool = me.pool ~= nil and me.pool.Enabled,
 		players = built,
 		arcs = arcs,
 		halo = me.halo ~= nil and me.halo.trail.Enabled,
