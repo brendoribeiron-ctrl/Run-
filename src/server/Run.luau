@@ -7,6 +7,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Config = require(ReplicatedStorage.Shared.Config)
 local RunMath = require(ReplicatedStorage.Shared.RunMath)
 local PlayerData = require(script.Parent.PlayerData)
+local Progress = require(script.Parent.Progress)
 local State = require(script.Parent.State)
 
 local Run = {}
@@ -44,14 +45,15 @@ function Run.isBusy(player: Player): boolean
 end
 
 -- Raridade a partir do tier da última parede quebrada; depois um personagem daquela raridade.
-function Run.rollCharacter(broken: number): string
+-- luckBoost multiplica a sorte da parede (poção de sorte).
+function Run.rollCharacter(broken: number, luckBoost: number?): string
 	local tier, luck = 1, 1
 	local weights: { number } = table.create(#Config.Rarities, 0)
 	if broken == 0 then
 		weights[1] = 1
 	else
 		local wall = Config.Walls[broken]
-		tier, luck = wall.tier, wall.luck
+		tier, luck = wall.tier, wall.luck * (luckBoost or 1)
 		local roll = Config.Roll
 		local lower = if tier > 1 then tier - 1 else tier
 		local higher = if tier < #Config.Rarities then tier + 1 else tier
@@ -88,6 +90,7 @@ function Run.start(player: Player): boolean
 		return false
 	end
 	sessions[player] = { chargeStart = os.clock(), running = false }
+	player:SetAttribute("Charging", true) -- os outros clientes fazem a aura dele crescer
 	return true
 end
 
@@ -95,6 +98,7 @@ function Run.cancel(player: Player)
 	local session = sessions[player]
 	if session and not session.running then
 		sessions[player] = nil
+		player:SetAttribute("Charging", false)
 	end
 end
 
@@ -119,6 +123,8 @@ function Run.finish(player: Player)
 		return
 	end
 	sessions[player] = nil
+	player:SetAttribute("Racing", false)
+	player:SetAttribute("Charging", false)
 	if session.reward then
 		grant(player, session.reward)
 	end
@@ -136,6 +142,7 @@ function Run.release(player: Player, chargeOverride: number?): Result?
 	if not session or session.running or not profile then
 		return nil
 	end
+	player:SetAttribute("Charging", false)
 	local run = Config.Run
 	local charge = chargeOverride or math.clamp((os.clock() - session.chargeStart) / run.chargeTime, 0, 1)
 	if charge < run.minCharge or not inZone(player) then
@@ -145,7 +152,8 @@ function Run.release(player: Player, chargeOverride: number?): Result?
 
 	local broken = RunMath.wallsBroken(RunMath.effectivePower(profile.power, charge))
 	local runTime = RunMath.stopStuds(broken) / run.speed
-	local characterId = Run.rollCharacter(broken)
+	local characterId = Run.rollCharacter(broken, Progress.luckBoost(player, profile))
+	Progress.count(player, "walls", broken)
 	local result: Result = {
 		charge = charge,
 		broken = broken,
@@ -156,6 +164,7 @@ function Run.release(player: Player, chargeOverride: number?): Result?
 
 	session.running = true
 	session.reward = characterId
+	player:SetAttribute("Racing", true) -- os outros clientes escondem a montaria dele
 	task.delay(runTime + run.returnDelay, function()
 		if sessions[player] == session then
 			Run.finish(player)

@@ -12,8 +12,11 @@ local Format = require(ReplicatedStorage.Shared.Format)
 local RunMath = require(ReplicatedStorage.Shared.RunMath)
 local Hall = require(script.Hall)
 local Pedestals = require(script.Pedestals)
+local Progress = require(script.Progress)
 local PlayerData = require(script.PlayerData)
 local Run = require(script.Run)
+local Mounts = require(script.Mounts)
+local Sanctum = require(script.Sanctum)
 local Scenery = require(script.Scenery)
 local State = require(script.State)
 local World = require(script.World)
@@ -25,7 +28,7 @@ local World = require(script.World)
 -- Super: S->C "start", senha, teclas | "result", acertou, ganho | "auto", ganho      C->S senha, acertou
 -- Auto: C->S "buy", nome | "toggle", nome, ligado
 -- Aura: C->S id da aura a equipar          Slot: C->S posição na mochila, slot rápido de destino
-State.createRemotes({ "BagHit", "Charge", "RunResult", "Select", "Fx", "Stat", "GoZone", "Super", "Auto", "Aura", "Slot" })
+State.createRemotes({ "BagHit", "Charge", "RunResult", "Select", "Fx", "Stat", "GoZone", "Super", "Auto", "Aura", "Slot", "Mount", "Cast", "Sell", "Rebirth", "Potion", "Daily", "Playtime", "Quest", "Fuse" })
 local remotes = State.remotes
 
 World.setupLighting()
@@ -33,6 +36,8 @@ World.buildLobby()
 Hall.build(World.buildHallway())
 World.buildBounds()
 -- os modelos vêm da Roblox (uma chamada por modelo): monta em paralelo, sem segurar o servidor
+task.spawn(Sanctum.build)
+task.spawn(Mounts.build)
 task.spawn(Scenery.build)
 
 local plotsFolder = Instance.new("Folder")
@@ -94,7 +99,47 @@ local function refreshBag(plot: Model, bagLevel: number)
 	end
 end
 
+-- Placa em cima da cabeça de cada boneco com o Poder e o dinheiro do jogador: todo mundo vê.
+local function headTag(player: Player, character: Model)
+	local head = character:WaitForChild("Head", 10)
+	if not head or not head:IsA("BasePart") then
+		return
+	end
+	local board = Instance.new("BillboardGui")
+	board.Name = "StatsTag"
+	board.Size = UDim2.fromScale(7, 1.1)
+	board.StudsOffsetWorldSpace = Vector3.new(0, 3.6, 0)
+	board.MaxDistance = 90
+	board.Adornee = head
+	local text = Instance.new("TextLabel")
+	text.Name = "Text"
+	text.BackgroundTransparency = 1
+	text.Size = UDim2.fromScale(1, 1)
+	text.Font = Enum.Font.FredokaOne
+	text.TextScaled = true
+	text.RichText = true
+	text.TextColor3 = Color3.new(1, 1, 1)
+	local stroke = Instance.new("UIStroke")
+	stroke.Thickness = 3
+	stroke.Color = Config.Palette.outline
+	stroke.Parent = text
+	text.Parent = board
+	local function refresh()
+		local power, money = player:GetAttribute("Power"), player:GetAttribute("Money")
+		text.Text = `<font color="#ffc42e">{Format.abbreviate(if type(power) == "number" then power else 0)} POWER</font>   <font color="#57ff57">${Format.abbreviate(if type(money) == "number" then money else 0)}</font>`
+	end
+	local connections = { player:GetAttributeChangedSignal("Power"):Connect(refresh), player:GetAttributeChangedSignal("Money"):Connect(refresh) }
+	board.Destroying:Connect(function()
+		for _, connection in connections do
+			connection:Disconnect()
+		end
+	end)
+	refresh()
+	board.Parent = head
+end
+
 local function placeCharacter(player: Player, character: Model)
+	task.spawn(headTag, player, character)
 	local plot = State.plot(player)
 	if not plot then
 		return
@@ -118,6 +163,20 @@ local function powerMultiplier(profile: PlayerData.Profile): number
 	return if aura and profile.power >= aura.power then aura.multiplier else 1
 end
 
+-- A primeira aura chega sozinha: quem ainda não tem nenhuma e alcança o Poder dela já sai
+-- com ela equipada.
+local function grantFirstAura(player: Player)
+	local profile = PlayerData.get(player)
+	local first = Config.Auras[1]
+	if profile and profile.aura == "" and profile.power >= first.power then
+		PlayerData.update(player, function(p)
+			p.aura = first.id
+		end)
+		State.remotes.Fx:FireClient(player, "toast", `AURA UNLOCKED: {first.name}!`)
+	end
+end
+
+-- Equipa a aura; clicar na que já está equipada tira.
 local function equipAura(player: Player, id: any): boolean
 	local profile = PlayerData.get(player)
 	local aura = if type(id) == "string" then Config.AuraById[id] else nil
@@ -129,9 +188,41 @@ local function equipAura(player: Player, id: any): boolean
 		return false
 	end
 	PlayerData.update(player, function(p)
-		p.aura = aura.id
+		p.aura = if p.aura == aura.id then "" else aura.id
 	end)
 	return true
+end
+
+-- Montarias: o primeiro clique compra (uma vez, com dinheiro), os seguintes equipam; clicar na
+-- que já está equipada desce dela. Devolve "bought", "on" ou "off".
+local function useMount(player: Player, id: any): string?
+	local profile = PlayerData.get(player)
+	local info = if type(id) == "string" then Config.MountById[id] else nil
+	if not profile or not info then
+		return nil
+	end
+	if profile.mount == info.id then
+		PlayerData.update(player, function(p)
+			p.mount = ""
+		end)
+		return "off"
+	end
+	local bought = false
+	if not profile.mounts[info.id] then
+		if profile.money < info.price then
+			State.remotes.Fx:FireClient(player, "toast", `Need ${Format.abbreviate(info.price)}!`)
+			return nil
+		end
+		bought = true
+	end
+	PlayerData.update(player, function(p)
+		if bought then
+			p.money -= info.price
+			p.mounts[info.id] = true
+		end
+		p.mount = info.id
+	end)
+	return if bought then "bought" else "on"
 end
 
 -- Mochila: leva o personagem da posição `from` para o slot rápido `slot`, trocando de lugar
@@ -153,6 +244,29 @@ local function moveToSlot(player: Player, from: any, slot: any): boolean
 	end
 	player:SetAttribute("Selected", target)
 	return true
+end
+
+-- Vende o personagem da posição `index` da mochila: sai do inventário e vira dinheiro (renda
+-- dele no nível atual x Config.Inventory.sellSeconds). Devolve quanto pagou. O índice e o
+-- nível do personagem não se perdem.
+local function sellCharacter(player: Player, index: any): number?
+	local profile = PlayerData.get(player)
+	if not profile or type(index) ~= "number" or index % 1 ~= 0 then
+		return nil
+	end
+	local id = profile.inventory[index]
+	if not id then
+		return nil
+	end
+	local price = Config.sellPrice(id, profile.levels[id] or 1)
+	PlayerData.update(player, function(p)
+		table.remove(p.inventory, index)
+		p.money += price
+	end)
+	-- a seleção continua no mesmo lugar da mochila (ou no último, se vendeu o último)
+	player:SetAttribute("Selected", math.min(index, #profile.inventory))
+	State.remotes.Fx:FireClient(player, "toast", `SOLD {Config.CharacterById[id].name}: +${Format.abbreviate(price)}`)
+	return price
 end
 
 -- Automáticos (Config.Auto): liberar por dinheiro ou Game Pass, ligar e desligar.
@@ -256,6 +370,8 @@ local function onPlayerAdded(player: Player)
 		return
 	end
 	player:SetAttribute("Selected", #profile.inventory)
+	player.CameraMaxZoomDistance = Config.Camera.maxZoom
+	Progress.join(player)
 	checkPasses(player)
 	refreshBag(State.plots[id], profile.bagLevel)
 	Pedestals.attach(player, State.plots[id])
@@ -278,11 +394,22 @@ local function onPlayerRemoving(player: Player)
 		refreshBag(State.plots[id], 1)
 		Pedestals.detach(State.plots[id])
 	end
+	Progress.leave(player)
 	lastHit[player] = nil
 	lastTeleport[player] = nil
 	supers[player] = nil
 	autoOn[player] = nil
 	PlayerData.release(player)
+end
+
+-- Efeitos que os outros jogadores veem (src/client/Others.luau): o servidor avisa todos menos
+-- quem fez, que já desenhou o próprio efeito.
+local function toOthers(player: Player, kind: string, a: any, b: any?)
+	for _, other in Players:GetPlayers() do
+		if other ~= player then
+			remotes.Fx:FireClient(other, kind, player, a, b)
+		end
+	end
 end
 
 -- Um soco. Valida dono do terreno, vida, distância e ritmo; o ganho é calculado aqui.
@@ -322,11 +449,13 @@ local function tryHit(player: Player, forceCrit: boolean?): (number?, number?, b
 	if crit then
 		gain = math.floor(gain * (Config.Crit.baseMultiplier + (profile.stats.critDamage or 0) * Config.Stats.critDamage.perLevel))
 	end
-	gain = math.floor(gain * powerMultiplier(profile))
+	gain = math.floor(gain * powerMultiplier(profile) * Progress.powerBoost(player, profile))
 	local tierBefore = RunMath.powerTier(profile.power)
 	PlayerData.update(player, function(p)
 		p.power += gain
 	end)
+	grantFirstAura(player)
+	Progress.count(player, "punch", 1)
 	local tierAfter = RunMath.powerTier(profile.power)
 	return gain, if tierAfter > tierBefore then tierAfter else nil, crit
 end
@@ -406,11 +535,13 @@ end
 
 -- Paga um super soco. Devolve o ganho e o tier novo, se subiu.
 local function superPay(player: Player, profile: PlayerData.Profile): (number, number?)
-	local gain = math.floor(Config.Bag.levels[profile.bagLevel].power * SUPER.multiplier * powerMultiplier(profile))
+	local gain = math.floor(Config.Bag.levels[profile.bagLevel].power * SUPER.multiplier * powerMultiplier(profile) * Progress.powerBoost(player, profile))
 	local tierBefore = RunMath.powerTier(profile.power)
 	PlayerData.update(player, function(p)
 		p.power += gain
 	end)
+	grantFirstAura(player)
+	Progress.count(player, "super", 1)
 	local tierAfter = RunMath.powerTier(profile.power)
 	return gain, if tierAfter > tierBefore then tierAfter else nil
 end
@@ -430,6 +561,7 @@ local function superOpen(player: Player): number?
 	if isAuto(player, "super") then
 		local gain, newTier = superPay(player, profile)
 		remotes.Super:FireClient(player, "auto", gain)
+		task.delay(SUPER.windTime, toOthers, player, "superOther", gain) -- na hora do golpe
 		if newTier then
 			task.delay(1.2, revealTier, player, newTier)
 		end
@@ -475,6 +607,7 @@ remotes.BagHit.OnServerEvent:Connect(function(player)
 	local gain, newTier, crit = tryHit(player)
 	if gain then
 		remotes.BagHit:FireClient(player, gain, crit)
+		toOthers(player, "hitOther", gain, crit == true)
 		-- como o crítico, mas mais raro: o soco vira super soco
 		if superRng:NextNumber() < SUPER.chance then
 			superOpen(player)
@@ -489,6 +622,9 @@ remotes.Super.OnServerEvent:Connect(function(player, token, success)
 	local gain, newTier = superFinish(player, token, success)
 	if gain then
 		remotes.Super:FireClient(player, "result", gain > 0, gain)
+		if gain > 0 then
+			task.delay(SUPER.windTime, toOthers, player, "superOther", gain)
+		end
 	end
 	if newTier then
 		task.delay(1.2, revealTier, player, newTier) -- depois do letreiro do super soco
@@ -508,6 +644,75 @@ end
 
 remotes.Stat.OnServerEvent:Connect(buyStat)
 remotes.Aura.OnServerEvent:Connect(equipAura)
+remotes.Mount.OnServerEvent:Connect(useMount)
+remotes.Sell.OnServerEvent:Connect(sellCharacter)
+
+-- Progressão (src/server/Progress.luau)
+local function rebirth(player: Player): boolean
+	if not Progress.rebirth(player) then
+		return false
+	end
+	local id = State.plotOf[player]
+	if id then
+		refreshBag(State.plots[id], 1)
+		Pedestals.attach(player, State.plots[id]) -- o dinheiro guardado zerou
+	end
+	return true
+end
+remotes.Rebirth.OnServerEvent:Connect(rebirth)
+remotes.Potion.OnServerEvent:Connect(Progress.buyPotion)
+remotes.Daily.OnServerEvent:Connect(Progress.claimDaily)
+remotes.Playtime.OnServerEvent:Connect(Progress.claimPlaytime)
+remotes.Quest.OnServerEvent:Connect(Progress.claimQuest)
+remotes.Fuse.OnServerEvent:Connect(Progress.fuse)
+
+-- Dash e pulo duplo nascem no cliente: ele avisa e o servidor repassa aos outros (só visual).
+local CASTS = { dash = true, jump = true }
+local lastCast: { [Player]: number } = {}
+remotes.Cast.OnServerEvent:Connect(function(player, kind)
+	local now = os.clock()
+	if type(kind) ~= "string" or not CASTS[kind] or now - (lastCast[player] or 0) < 0.25 then
+		return
+	end
+	lastCast[player] = now
+	toOthers(player, "castOther", kind)
+end)
+Players.PlayerRemoving:Connect(function(player)
+	lastCast[player] = nil
+end)
+
+-- Espelho das poses (src/client/Pose.luau): cada cliente manda a pose final do próprio boneco e
+-- o servidor só repassa aos outros. É cosmético e vai por canal não confiável; aqui confere o
+-- formato e segura o ritmo de quem mandar demais.
+local POSE_BYTES = 96
+local POSE_RATE = 24 -- pacotes por segundo, no máximo
+local poseSync = Instance.new("UnreliableRemoteEvent")
+poseSync.Name = "PoseSync"
+poseSync.Parent = ReplicatedStorage:WaitForChild("Remotes")
+local poseBudget: { [Player]: { at: number, count: number } } = {}
+poseSync.OnServerEvent:Connect(function(player, data)
+	if typeof(data) ~= "buffer" or buffer.len(data) ~= POSE_BYTES then
+		return
+	end
+	local now = os.clock()
+	local budget = poseBudget[player]
+	if not budget or now - budget.at >= 1 then
+		budget = { at = now, count = 0 }
+		poseBudget[player] = budget
+	end
+	budget.count += 1
+	if budget.count > POSE_RATE then
+		return
+	end
+	for _, other in Players:GetPlayers() do
+		if other ~= player then
+			poseSync:FireClient(other, player, data)
+		end
+	end
+end)
+Players.PlayerRemoving:Connect(function(player)
+	poseBudget[player] = nil
+end)
 remotes.Slot.OnServerEvent:Connect(moveToSlot)
 remotes.Auto.OnServerEvent:Connect(function(player, action, name, on)
 	if action == "buy" then
@@ -563,8 +768,8 @@ end
 
 -- Dá um de cada personagem (inventário e índice), todas as auras (pelo Poder), skills no
 -- máximo, dinheiro e Poder.
--- Só para teste: nunca é ligado fora do Studio.
-local GIVEALL_POWER = 10_000_000 -- quebra a última parede (3M) até com carga mínima
+-- Comando de admin (/giveall); também usado pelos testes.
+local GIVEALL_POWER = Config.Walls[#Config.Walls].power * 4 -- quebra a última parede até com carga mínima
 for _, aura in Config.Auras do
 	GIVEALL_POWER = math.max(GIVEALL_POWER, aura.power) -- e libera todas as auras
 end
@@ -582,6 +787,10 @@ local function giveAll(player: Player): number
 		for name, stat in Config.Stats do
 			p.stats[name] = stat.max
 		end
+		p.slots = #Config.Plot.pedestals
+		for _, info in Config.Mounts do
+			p.mounts[info.id] = true
+		end
 		table.clear(p.inventory)
 		for _, info in Config.Characters do
 			if #p.inventory < Config.Inventory.maxItems then
@@ -591,24 +800,112 @@ local function giveAll(player: Player): number
 		end
 	end)
 	player:SetAttribute("Selected", 1)
+	local id = State.plotOf[player]
+	if id then
+		Pedestals.attach(player, State.plots[id]) -- os pedestais liberados aparecem na hora
+	end
 	return #profile.inventory
 end
 
--- Gancho de teste: só existe no Studio. Os testes em src/server/tests chamam por aqui.
-if RunService:IsStudio() then
-	-- comando de chat /giveall
+-- Quem é admin: todo mundo no Studio; no jogo publicado, o dono, quem está em Config.Admins
+-- e, em jogo de grupo, quem tem o cargo de Config.AdminGroupRank para cima.
+local adminCache: { [number]: boolean } = {}
+local function isAdmin(player: Player): boolean
+	if RunService:IsStudio() then
+		return true
+	end
+	local cached = adminCache[player.UserId]
+	if cached ~= nil then
+		return cached
+	end
+	local admin = table.find(Config.Admins, player.UserId) ~= nil
+	if not admin then
+		if game.CreatorType == Enum.CreatorType.User then
+			admin = player.UserId == game.CreatorId
+		else
+			-- consulta à Roblox: pode falhar; nesse caso não é admin agora e tenta de novo depois
+			local ok, rank = pcall(function()
+				return player:GetRankInGroup(game.CreatorId)
+			end)
+			if not ok then
+				return false
+			end
+			admin = rank >= Config.AdminGroupRank
+		end
+	end
+	adminCache[player.UserId] = admin
+	return admin
+end
+
+-- Zera o jogador: perfil de jogador novo, terreno limpo e boneco de volta ao começo.
+local function resetPlayer(player: Player): boolean
+	if not PlayerData.get(player) then
+		return false
+	end
+	Run.finish(player)
+	PlayerData.reset(player)
+	supers[player] = nil
+	autoOn[player] = nil
+	lastHit[player] = nil
+	player:SetAttribute("Selected", 0)
+	local id = State.plotOf[player]
+	if id then
+		refreshBag(State.plots[id], 1)
+		Pedestals.attach(player, State.plots[id])
+		local character = player.Character
+		if character and character.Parent then
+			character:PivotTo(State.spawnCFrame(State.plots[id]))
+		end
+	end
+	return true
+end
+
+-- Comandos de chat de admin. Quem não é admin não recebe nada (nem aviso de que o comando
+-- existe). Sem nome, o comando vale para quem digitou; com um nome (ou o começo dele), vale
+-- para aquele jogador:  /giveall   /giveall fulano   /reset   /reset fulano
+local function adminCommand(name: string, alias: string, action: (admin: Player, target: Player) -> string)
 	local command = Instance.new("TextChatCommand")
-	command.Name = "GiveAll"
-	command.PrimaryAlias = "/giveall"
-	command.Triggered:Connect(function(source)
-		local player = Players:GetPlayerByUserId(source.UserId)
-		if player then
-			local count = giveAll(player)
-			remotes.Fx:FireClient(player, "toast", `GIVEALL: {count} characters, all auras, max skills, money and power!`)
+	command.Name = name
+	command.PrimaryAlias = alias
+	command.Triggered:Connect(function(source, text)
+		local admin = Players:GetPlayerByUserId(source.UserId)
+		if not admin or not isAdmin(admin) then
+			return
+		end
+		local target = admin
+		local wanted = string.lower(string.match(text, "^%S+%s+(%S+)") or "")
+		if wanted ~= "" then
+			local found: Player? = nil
+			for _, other in Players:GetPlayers() do
+				if string.sub(string.lower(other.Name), 1, #wanted) == wanted or string.sub(string.lower(other.DisplayName), 1, #wanted) == wanted then
+					found = other
+					break
+				end
+			end
+			if not found then
+				remotes.Fx:FireClient(admin, "toast", `No player called "{wanted}" here.`)
+				return
+			end
+			target = found
+		end
+		local message = action(admin, target)
+		remotes.Fx:FireClient(admin, "toast", message)
+		if target ~= admin then
+			remotes.Fx:FireClient(target, "toast", message)
 		end
 	end)
 	command.Parent = game:GetService("TextChatService")
+end
+adminCommand("GiveAll", "/giveall", function(_, target)
+	local count = giveAll(target)
+	return `GIVEALL ({target.Name}): {count} characters, all auras, max skills, money and power!`
+end)
+adminCommand("Reset", "/reset", function(_, target)
+	return if resetPlayer(target) then `RESET ({target.Name}): everything back to zero.` else `RESET ({target.Name}): no data loaded.`
+end)
 
+-- Gancho de teste: só existe no Studio. Os testes em src/server/tests chamam por aqui.
+if RunService:IsStudio() then
 	-- TestUi: S->C, os testes perguntam ao cliente o estado das janelas e das poses
 	local testUi = Instance.new("RemoteFunction")
 	testUi.Name = "TestUi"
@@ -648,9 +945,52 @@ if RunService:IsStudio() then
 			return Run.rollCharacter(value)
 		elseif command == "pedestal" then
 			return Pedestals.interact(player, value)
+		elseif command == "mount" then
+			return useMount(player, value)
+		elseif command == "collect" then
+			return Pedestals.collect(player)
+		elseif command == "fighterUp" then
+			return Pedestals.upgrade(player, value)
+		elseif command == "refreshPlot" then
+			Pedestals.attach(player, State.plots[State.plotOf[player]])
+			return true
 		elseif command == "tick" then
 			Pedestals.tick()
 			return true
+		elseif command == "progress" then
+			-- value = { action, arg }: chama direto as funções de Progress
+			local action, arg = value.action, value.arg
+			if action == "rebirth" then
+				return rebirth(player)
+			elseif action == "rebirthCost" then
+				return Progress.rebirthCost(arg)
+			elseif action == "potion" then
+				return Progress.buyPotion(player, arg)
+			elseif action == "daily" then
+				return Progress.claimDaily(player)
+			elseif action == "playtime" then
+				return Progress.claimPlaytime(player, arg)
+			elseif action == "played" then
+				Progress.setPlayed(player, arg)
+				return true
+			elseif action == "quest" then
+				return Progress.claimQuest(player, arg)
+			elseif action == "count" then
+				Progress.count(player, arg.id, arg.amount)
+				return true
+			elseif action == "fuse" then
+				return Progress.fuse(player, arg)
+			elseif action == "boosts" then
+				local profile = PlayerData.get(player) :: PlayerData.Profile
+				return { power = Progress.powerBoost(player, profile), money = Progress.moneyBoost(player, profile), luck = Progress.luckBoost(player, profile) }
+			end
+			return nil
+		elseif command == "sell" then
+			return sellCharacter(player, value)
+		elseif command == "reset" then
+			return resetPlayer(player)
+		elseif command == "isAdmin" then
+			return isAdmin(player)
 		elseif command == "giveAll" then
 			return giveAll(player)
 		elseif command == "auraEquip" then

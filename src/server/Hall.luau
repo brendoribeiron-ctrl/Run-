@@ -192,6 +192,113 @@ local function ceiling(parent: Instance, z: number, length: number, width: numbe
 	end
 end
 
+-- Fachada do portão, em z: o mesmo par de pilares e arco do salão emoldurando a entrada, a
+-- parede fechada em volta do arco, cornija, moldura do letreiro, frontão em degraus e, nos dois
+-- pilares grandes (que são de World.luau e colidem), base, anéis, estandarte, lanterna e pináculo.
+local function facade(parent: Instance, z: number)
+	local run = Config.Run
+	local half = run.hallwayWidth / 2
+	local top = G + run.wallHeight
+	local pierW, pierH = HALL.pierWidth, HALL.pierHeight
+	local model = Instance.new("Model")
+	model.Name = "Facade"
+
+	local front = Instance.new("Model")
+	front.Name = "FrontArch"
+	for _, side in { -1, 1 } do
+		pillar(front, side * HALL.pillarOffset)
+	end
+	local height = arch(front)
+	front.WorldPivot = CFrame.new(0, G, 0)
+	front:PivotTo(CFrame.new(0, G, z + 0.4))
+	front.Parent = model
+
+	-- parede entre o arco e o topo: colunas finas que acompanham os trechos retos do arco
+	local span, steps = HALL.pillarOffset, HALL.archSteps
+	local function chord(x: number): number
+		local t = math.clamp((span - math.abs(x)) / span * steps, 0, steps)
+		local i = math.min(math.floor(t), steps - 1)
+		local h0, h1 = height(span * (1 - i / steps)), height(span * (1 - (i + 1) / steps))
+		return h0 + (h1 - h0) * (t - i)
+	end
+	local slice = 0.5
+	for i = 0, math.floor(span / slice) - 1 do
+		local x = (i + 0.5) * slice
+		local bottom = G + HALL.pillarHeight + chord(x)
+		for _, side in { -1, 1 } do
+			piece(model, "Dark", Vector3.new(slice, top - bottom, 2), CFrame.new(side * x, (top + bottom) / 2, z))
+		end
+	end
+	for _, side in { -1, 1 } do
+		piece(model, "Dark", Vector3.new(half - span, run.wallHeight, 2), CFrame.new(side * (half + span) / 2, G + run.wallHeight / 2, z))
+	end
+	piece(model, "Trim", Vector3.new(half * 2, 0.35, 0.5), CFrame.new(0, top - 0.4, z + 1.2))
+
+	-- cornija, parede do letreiro com moldura e tampa
+	local signTop = G + HALL.signBase + HALL.signHeight
+	piece(model, "Gold", Vector3.new((half + pierW) * 2 + 1, 1.2, 8.4), CFrame.new(0, top + 0.6, z))
+	piece(model, "Dark", Vector3.new(half * 2, signTop + 1 - top, 4), CFrame.new(0, (signTop + 1 + top) / 2, z - 1))
+	for _, y in { G + HALL.signBase - 0.3, signTop + 0.3 } do
+		piece(model, "Gold", Vector3.new(half * 2, 0.6, 1.6), CFrame.new(0, y, z + 2))
+	end
+	local cap = signTop + 1
+	piece(model, "Dark", Vector3.new(half * 2, 1.5, 6), CFrame.new(0, cap + 0.75, z))
+	piece(model, "Trim", Vector3.new(half * 2, 0.3, 0.5), CFrame.new(0, cap + 0.2, z + 3.1))
+
+	-- frontão em degraus, com o mesmo losango do alto dos arcos
+	local y = cap + 1.5
+	for _, wide in { 28, 18, 8 } do
+		piece(model, "Stone", Vector3.new(wide, 2.2, 4), CFrame.new(0, y + 1.1, z))
+		piece(model, "Gold", Vector3.new(wide + 0.8, 0.5, 4.6), CFrame.new(0, y + 2.45, z))
+		y += 2.7
+	end
+	local apex = CFrame.new(0, y + 2.2, z) * CFrame.Angles(0, 0, math.rad(45))
+	piece(model, "Gold", Vector3.new(3.6, 3.6, 3.2), apex)
+	piece(model, "Gem", Vector3.new(1.6, 1.6, 3.5), apex)
+
+	for _, side in { -1, 1 } do
+		local x = side * (half + pierW / 2)
+		piece(model, "Dark", Vector3.new(pierW + 1.2, 2.4, 8.2), CFrame.new(x, G + 1.2, z))
+		for _, ring in { 2.8, HALL.pillarHeight - 1.5, top - 5 } do
+			piece(model, "Gold", Vector3.new(pierW + 0.6, 0.8, 7.6), CFrame.new(x, G + ring, z))
+		end
+		-- capitel e pináculo
+		local base = G + pierH
+		piece(model, "Gold", Vector3.new(pierW + 0.8, 0.8, 7.8), CFrame.new(x, base - 0.4, z))
+		piece(model, "Dark", Vector3.new(pierW + 1.6, 1.2, 8.6), CFrame.new(x, base + 0.6, z))
+		local level = base + 1.2
+		for _, wide in { 6, 4.4, 2.8 } do
+			piece(model, "Stone", Vector3.new(wide, 2.6, wide), CFrame.new(x, level + 1.3, z))
+			level += 2.6
+		end
+		local tip = CFrame.new(x, level + 1.3, z) * CFrame.Angles(0, 0, math.rad(45))
+		piece(model, "Gold", Vector3.new(1.9, 1.9, 1.9), tip)
+		piece(model, "Gem", Vector3.new(0.9, 0.9, 2.1), tip)
+
+		-- estandarte na frente do pilar e, embaixo dele, uma lanterna
+		local cloth = Instance.new("Model")
+		cloth.Name = "Banner"
+		banner(cloth, x, top - 6)
+		cloth.WorldPivot = CFrame.new(0, G, 0)
+		cloth:PivotTo(CFrame.new(0, G, z + 3.75))
+		cloth.Parent = model
+
+		local lamp = Vector3.new(x, G + 20, z + 5)
+		piece(model, "Gold", Vector3.new(0.3, 0.3, 1.8), CFrame.new(x, G + 22, z + 4.2))
+		piece(model, "Gold", Vector3.new(0.2, 1, 0.2), CFrame.new(lamp + Vector3.new(0, 1.6, 0)))
+		piece(model, "Gold", Vector3.new(1.7, 0.25, 1.7), CFrame.new(lamp + Vector3.new(0, 1.1, 0)))
+		piece(model, "Gold", Vector3.new(1.7, 0.25, 1.7), CFrame.new(lamp - Vector3.new(0, 1.1, 0)))
+		local core = piece(model, "Glow", Vector3.new(1.3, 2, 1.3), CFrame.new(lamp))
+		local light = Instance.new("PointLight")
+		light.Color = STYLE.Glow.color
+		light.Range = HALL.facadeLightRange
+		light.Brightness = HALL.facadeLightBrightness
+		light.Parent = core
+	end
+
+	model.Parent = parent
+end
+
 -- Monta um trecho (pilares e arco em z = 0, janelas e desenho do piso mais adiante) e o copia
 -- pelo corredor. Os arcos ficam sempre um pouco antes de onde pode haver uma parede quebrável,
 -- e o resto do trecho depois dela: nada da decoração atravessa uma parede. A entrada, do
@@ -203,9 +310,9 @@ function Hall.build(parent: Instance): number
 	local endZ = run.zoneCenter.Z - Config.Walls[#Config.Walls].distance / run.metersPerStud - run.endPadding
 	local length = HALL.spacing
 
-	-- muros, tampa e fundo do corredor também deixam o sol passar
+	-- muros e fundo do corredor também deixam o sol passar
 	for _, child in parent:GetChildren() do
-		if child:IsA("BasePart") and (child.Name == "SideWall" or child.Name == "SideCap" or child.Name == "EndWall") then
+		if child:IsA("BasePart") and (child.Name == "SideWall" or child.Name == "EndWall") then
 			child.CastShadow = false
 		end
 	end
@@ -250,6 +357,8 @@ function Hall.build(parent: Instance): number
 		ceiling(caps, (z + endZ) / 2, z - endZ, run.hallwayWidth)
 	end
 	caps.Parent = folder
+
+	facade(folder, lawnEdge - 3)
 
 	folder.Parent = parent
 	return count

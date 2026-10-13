@@ -108,6 +108,15 @@ function World.setupLighting()
 end
 
 function World.buildLobby(): Folder
+	-- sobras do place vazio do Studio: a Baseplate (cinza, sem textura do jogo) passava por cima
+	-- do chão de fora em volta do gramado, e o spawn padrão ficava no meio do mapa
+	for _, name in { "Baseplate", "SpawnLocation" } do
+		local leftover = workspace:FindFirstChild(name)
+		if leftover and leftover:IsA("BasePart") then
+			leftover:Destroy()
+		end
+	end
+
 	local lobby = Instance.new("Folder")
 	lobby.Name = "Lobby"
 
@@ -337,14 +346,21 @@ function World.buildHallway(): Folder
 	floorGui.Parent = floorText
 	zone:SetAttribute("Kind", "ChargeZone")
 
-	-- portão com o letreiro de duas linhas, virado para os terrenos
+	-- portão: os dois pilares grandes da fachada e o letreiro de duas linhas acima do arco da
+	-- entrada, virado para os terrenos. A decoração da fachada fica em Hall.luau.
 	local gateZ = lawnEdge - 3
+	local hall = Config.Hall
 	for _, side in { -1, 1 } do
-		part(hallway, { name = "GatePillar", size = Vector3.new(5, 26, 7), cframe = CFrame.new(side * (width / 2 + 2.5), G + 13, gateZ), color = P.navy })
-		part(hallway, { name = "GateBand", size = Vector3.new(5.4, 1.5, 6.4), cframe = CFrame.new(side * (width / 2 + 2.5), G + 6, gateZ), color = P.machineYellow })
+		local pier = part(hallway, {
+			name = "GatePillar",
+			size = Vector3.new(hall.pierWidth, hall.pierHeight, 7),
+			cframe = CFrame.new(side * (width / 2 + hall.pierWidth / 2), G + hall.pierHeight / 2, gateZ),
+			color = Color3.fromRGB(58, 68, 170),
+			material = Enum.Material.Slate,
+		})
+		pier.CastShadow = false
 	end
-	-- letreiro apoiado no topo dos pilares do portão (26 de altura)
-	local board = part(hallway, { name = "Billboard", size = Vector3.new(width + 10, 9, 1.5), cframe = CFrame.new(0, G + 26 + 4.5, gateZ), color = P.navy })
+	local board = part(hallway, { name = "Billboard", size = Vector3.new(width, hall.signHeight, 1.5), cframe = CFrame.new(0, G + hall.signBase + hall.signHeight / 2, gateZ + 1.75), color = P.navy, collide = false })
 	local boardGui = Instance.new("SurfaceGui")
 	boardGui.Face = Enum.NormalId.Back -- +Z, lado dos terrenos
 	boardGui.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
@@ -375,12 +391,12 @@ function World.buildHallway(): Folder
 			end
 		end
 	end
-	local segment = 40
-	for i = 0, length // segment do
-		local z = lawnEdge - 6 - (i + 0.5) * segment
-		if z - segment / 2 < endZ - 1 then
-			break
-		end
+	-- muros laterais, da fachada até o muro do fim, em trechos iguais (sem sobra no final)
+	local wallStart = lawnEdge - 6
+	local wallCount = math.ceil((wallStart - endZ) / 40)
+	local segment = (wallStart - endZ) / wallCount
+	for i = 0, wallCount - 1 do
+		local z = wallStart - (i + 0.5) * segment
 		for _, side in { -1, 1 } do
 			part(hallway, {
 				name = "SideWall",
@@ -390,9 +406,6 @@ function World.buildHallway(): Folder
 				material = Enum.Material.Slate,
 			})
 		end
-	end
-	for _, side in { -1, 1 } do
-		part(hallway, { name = "SideCap", size = Vector3.new(7, 1, length), cframe = CFrame.new(side * (width / 2 + 3), G + run.wallHeight + 0.5, midZ), color = Color3.fromRGB(22, 24, 72), material = Enum.Material.Slate })
 	end
 	part(hallway, { name = "EndWall", size = Vector3.new(width + 12, run.wallHeight, 6), cframe = CFrame.new(0, G + run.wallHeight / 2, endZ - 3), color = Color3.fromRGB(40, 46, 122), material = Enum.Material.Slate })
 
@@ -541,54 +554,58 @@ local function buildGantry(plot: Model, origin: CFrame)
 	gantry.Parent = plot
 end
 
-local function buildPedestal(plot: Model, origin: CFrame, index: number, offset: Vector3, locked: boolean)
+local function buildPedestal(plot: Model, origin: CFrame, index: number, offset: Vector3, cost: number)
 	local pedestal = Instance.new("Model")
 	pedestal.Name = "Pedestal" .. index
 	pedestal:SetAttribute("PedestalIndex", index)
-	pedestal:SetAttribute("Locked", locked)
-	local top = 1.1 -- logo acima do topo da laje (1.0)
-	local center = origin * CFrame.new(offset.X, top, offset.Z)
-	part(pedestal, {
-		name = "Rim",
-		size = Vector3.new(8, 0.2, 8),
-		cframe = center,
-		color = if locked then P.red else P.cyan,
-		material = Enum.Material.Neon,
-		collide = false,
-	})
-	local pad = part(pedestal, { name = "Pad", size = Vector3.new(7, 0.3, 7), cframe = center * CFrame.new(0, 0.1, 0), color = P.navy })
+	local slab = 1.0 -- topo da laje
+	local height = Config.Plot.pedestalHeight
+	local diameter = Config.Plot.pedestalDiameter
+	local base = (origin * CFrame.new(offset.X, slab, offset.Z)).Position
+	-- redondo e elevado: anel de neon na laje, corpo escuro, friso e tampo onde o personagem fica
+	local rim = uprightCylinder(pedestal, "Rim", diameter + 1.2, 0.2, base + Vector3.new(0, 0.1, 0), P.cyan, Enum.Material.Neon)
+	rim.CanCollide = false
+	uprightCylinder(pedestal, "Body", diameter, height - 0.3, base + Vector3.new(0, (height - 0.3) / 2, 0), P.navy)
+	local band = uprightCylinder(pedestal, "Band", diameter + 0.3, 0.25, base + Vector3.new(0, height - 0.55, 0), P.machineYellow)
+	band.CanCollide = false
+	local pad = uprightCylinder(pedestal, "Pad", diameter - 0.6, 0.3, base + Vector3.new(0, height - 0.15, 0), P.slab)
 	pedestal.PrimaryPart = pad
 
-	if not locked then
-		local prompt = Instance.new("ProximityPrompt")
-		prompt.Name = "Prompt"
-		prompt.ObjectText = "Pedestal " .. index
-		prompt.ActionText = "Place"
-		prompt.HoldDuration = 0
-		prompt.MaxActivationDistance = 9
-		prompt.RequiresLineOfSight = false
-		prompt.Enabled = false
-		prompt.Parent = pad
+	local prompt = Instance.new("ProximityPrompt")
+	prompt.Name = "Prompt"
+	prompt.ObjectText = "Pedestal " .. index
+	prompt.ActionText = "Place"
+	prompt.HoldDuration = 0
+	prompt.MaxActivationDistance = 10
+	prompt.RequiresLineOfSight = false
+	prompt.Enabled = false
+	prompt.Parent = pad
 
-		-- pad verde no chão, na frente do pedestal: mostra o dinheiro guardado; pisar coleta
-		local cash = part(pedestal, {
-			name = "CashPad",
-			size = Vector3.new(5, 0.2, 3),
-			cframe = center * CFrame.new(0, 0, -5.6) * CFrame.Angles(0, math.rad(180), 0),
-			color = Color3.fromRGB(40, 200, 80),
-			collide = false,
-			transparency = 1,
-		})
-		local gui = Instance.new("SurfaceGui")
-		gui.Name = "Gui"
-		gui.Face = Enum.NormalId.Top
-		gui.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
-		gui.PixelsPerStud = 40
-		gui.LightInfluence = 0
-		gui.Enabled = false
-		label(gui, "Amount", "$0", Color3.fromRGB(255, 255, 255), UDim2.fromScale(0.9, 0.8), UDim2.fromScale(0.05, 0.1))
-		gui.Parent = cash
-	end
+	-- segundo prompt, em outra tecla: sobe o nível do personagem que está no pedestal
+	local upgrade = Instance.new("ProximityPrompt")
+	upgrade.Name = "Upgrade"
+	upgrade.ObjectText = "Level Up"
+	upgrade.ActionText = "Level Up"
+	upgrade.KeyboardKeyCode = Enum.KeyCode.F
+	upgrade.GamepadKeyCode = Enum.KeyCode.ButtonY
+	upgrade.UIOffset = Vector2.new(0, 78)
+	upgrade.HoldDuration = 0
+	upgrade.MaxActivationDistance = 10
+	upgrade.RequiresLineOfSight = false
+	upgrade.Enabled = false
+	upgrade.Parent = pad
+
+	-- preço flutuando em cima do pedestal trancado
+	local lock = Instance.new("BillboardGui")
+	lock.Name = "Lock"
+	lock.Size = UDim2.fromScale(7, 2.6)
+	lock.StudsOffsetWorldSpace = Vector3.new(0, 2.6, 0)
+	lock.MaxDistance = 70
+	lock.Enabled = false
+	label(lock, "Title", "LOCKED", P.red, UDim2.fromScale(1, 0.5), UDim2.fromScale(0, 0))
+	label(lock, "Price", if cost > 0 then "$" .. Format.abbreviate(cost) else "", P.money, UDim2.fromScale(1, 0.5), UDim2.fromScale(0, 0.5))
+	lock.Parent = pad
+
 	pedestal.Parent = plot
 end
 
@@ -621,10 +638,37 @@ function World.buildPlot(index: number): Model
 	end
 
 	for i, info in Config.Plot.pedestals do
-		buildPedestal(plot, origin, i, info.offset, info.locked)
+		buildPedestal(plot, origin, i, info.offset, info.cost)
 	end
 
 	buildGantry(plot, origin)
+
+	-- um só botão de coleta por terreno: mostra a soma do que todos os pedestais guardam;
+	-- pisar nele recolhe tudo
+	local collect = part(plot, {
+		name = "Collect",
+		size = Vector3.new(12, 0.5, 6),
+		cframe = origin * CFrame.new(Config.Plot.collectOffset.X, 0.65, Config.Plot.collectOffset.Z) * CFrame.Angles(0, math.rad(180), 0),
+		color = Color3.fromRGB(40, 200, 80),
+		collide = false,
+	})
+	part(plot, {
+		name = "CollectRim",
+		size = Vector3.new(13, 0.3, 7),
+		cframe = collect.CFrame * CFrame.new(0, -0.15, 0),
+		color = Color3.fromRGB(150, 255, 170),
+		material = Enum.Material.Neon,
+		collide = false,
+	})
+	local collectGui = Instance.new("SurfaceGui")
+	collectGui.Name = "Gui"
+	collectGui.Face = Enum.NormalId.Top
+	collectGui.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
+	collectGui.PixelsPerStud = 40
+	collectGui.LightInfluence = 0
+	label(collectGui, "Title", "COLLECT", Color3.fromRGB(255, 255, 255), UDim2.fromScale(0.9, 0.42), UDim2.fromScale(0.05, 0.06))
+	label(collectGui, "Amount", "$0", P.yellowLine, UDim2.fromScale(0.9, 0.5), UDim2.fromScale(0.05, 0.46))
+	collectGui.Parent = collect
 
 	-- Ponto de nascimento no tapete, virado para o saco.
 	local spawnPos = (origin * CFrame.new(Config.Plot.spawnOffset.X, 0.5, Config.Plot.spawnOffset.Z)).Position

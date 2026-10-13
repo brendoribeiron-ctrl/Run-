@@ -50,15 +50,17 @@ check("dano de crítico soma por nível", hook:Invoke("hit", player, "crit") == 
 hook:Invoke("set", player, { stats = { speed = Config.Stats.speed.max } })
 check("nível máximo recusa", hook:Invoke("buyStat", player, "speed") == false, "no máximo")
 
--- chance: com 20 níveis (48%) saem bem mais críticos que os 8% base
-hook:Invoke("set", player, { stats = { critChance = 20 } })
+-- chance: no nível máximo saem bem mais críticos que na chance base
+local maxLevel = Config.Stats.critChance.max
+local maxChance = Config.Crit.baseChance + maxLevel * Config.Stats.critChance.perLevel
+hook:Invoke("set", player, { stats = { critChance = maxLevel } })
 local crits = 0
 for _ = 1, 300 do
 	if hook:Invoke("hit", player) > base then
 		crits += 1
 	end
 end
-check("chance de crítico sobe com o atributo", crits > 90 and crits < 200, crits .. "/300")
+check("chance de crítico sobe com o atributo", crits > 300 * maxChance * 0.55 and crits < 300 * maxChance * 1.6 and maxChance > Config.Crit.baseChance * 2, `{crits}/300 com chance {maxChance}`)
 
 hook:Invoke("set", player, { power = 0, money = 0, stats = {} })
 return `{#passed} verificações OK: ` .. table.concat(passed, "; ")

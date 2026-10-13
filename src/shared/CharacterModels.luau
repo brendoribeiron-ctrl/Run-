@@ -63,7 +63,7 @@ function CharacterModels.build(id: string, scale: number?): Model
 
 	local model = Instance.new("Model")
 	model.Name = info.name
-	local glow = if info.rarity >= 4 then Enum.Material.Neon else Enum.Material.SmoothPlastic
+	local glow = if info.rarity >= 4 or info.shiny then Enum.Material.Neon else Enum.Material.SmoothPlastic
 
 	for _, side in { -1, 1 } do
 		piece(model, "Leg", Vector3.new(0.9, 1.6, 0.95), CFrame.new(side * 0.52, 0.8, 0), info.pants)
@@ -80,6 +80,14 @@ function CharacterModels.build(id: string, scale: number?): Model
 	end
 	piece(model, "Mouth", Vector3.new(0.5, 0.1, 0.06), CFrame.new(0, 3.72, -0.71), DARK)
 	addHat(model, info.hat, info.glove, glow)
+
+	-- Shiny: estrelinhas douradas em volta
+	if info.shiny then
+		for i = 1, 4 do
+			local angle = i * math.pi / 2 + 0.6
+			piece(model, "Spark", Vector3.new(0.34, 0.34, 0.34), CFrame.new(math.cos(angle) * 1.9, 1 + i * 0.85, math.sin(angle) * 1.9) * CFrame.Angles(math.rad(45), math.rad(45), 0), Color3.fromRGB(255, 235, 140), Enum.Material.Neon)
+		end
+	end
 
 	-- os dois tiers mais altos ganham orbes flutuando
 	if info.rarity >= 5 then

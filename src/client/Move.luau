@@ -71,6 +71,9 @@ function Move.walkSpeed(): number
 	return MOVE.walk + (if type(level) == "number" then level else 0) * Config.Stats.speed.perLevel
 end
 
+-- avisa o servidor do dash e do pulo duplo, para os outros clientes desenharem o efeito
+local castRemote: RemoteEvent? = nil
+
 local function stomp(position: Vector3, size: number, cubes: number)
 	Fx.burst(position, WHITE, size, 0.3)
 	Fx.ring(position + Vector3.new(0, 0.2, 0), Aura.color(), size * 1.6, 0.35)
@@ -117,6 +120,9 @@ local function dash()
 	end
 	Fx.shake(0.25)
 	Aura.forceTrails(true)
+	if castRemote then
+		castRemote:FireServer("dash") -- os outros jogadores veem o efeito
+	end
 end
 
 -- Pulo duplo: um pulo extra com mortal. A janela é larga de propósito: vale a qualquer momento
@@ -154,6 +160,9 @@ local function doubleJump()
 		end)
 	end
 	flipStart = os.clock()
+	if castRemote then
+		castRemote:FireServer("jump")
+	end
 
 	local color = Aura.color()
 	local below = root.Position - Vector3.new(0, 2.6, 0)
@@ -235,6 +244,12 @@ end
 Move.dash = dash -- o gancho de teste dispara o dash sem tecla
 
 function Move.start()
+	task.spawn(function()
+		local found = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("Cast", 30)
+		if found and found:IsA("RemoteEvent") then
+			castRemote = found
+		end
+	end)
 	-- inclinação: soma na junta Root (corpo inteiro)
 	Pose.define("lean", { Root = CFrame.identity }, true, 30)
 	Pose.weight("lean", 1, true)

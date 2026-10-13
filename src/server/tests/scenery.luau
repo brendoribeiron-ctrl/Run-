@@ -10,8 +10,10 @@ local folder = workspace:WaitForChild("Scenery", 60)
 assert(folder, "o cenário não apareceu em 60 s")
 
 local expected = 0
-for _ in Assets do
-	expected += 1
+for name in Assets do
+	if name ~= "sanctum" and name ~= "potion_shop" and not Config.MountById[name] then -- casa do centro e montarias não são cenário
+		expected += 1
+	end
 end
 assert(folder:GetAttribute("Models") == expected, `carregaram {folder:GetAttribute("Models")} de {expected} modelos`)
 
@@ -54,7 +56,7 @@ assert(#folder:GetChildren() > 300, "poucas peças no cenário: " .. #folder:Get
 assert(colliding == 0, colliding .. " peças colidem ou estão soltas")
 assert(inPlay == 0, inPlay .. " modelos dentro da zona de carga ou dos terrenos")
 for name in Assets do
-	assert((counts[name] or 0) > 0, "modelo nunca usado: " .. name)
+	assert(name == "sanctum" or name == "potion_shop" or Config.MountById[name] ~= nil or (counts[name] or 0) > 0, "modelo nunca usado: " .. name)
 end
 
 local summary = {}

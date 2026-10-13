@@ -195,7 +195,10 @@ local gate = Config.Run.hallwayWidth / 2 + 8 -- meia largura livre na frente do 
 local function busy(x: number, z: number): boolean
 	local plots = z > W.plotRowZ - W.plotSize.Y / 2 - 20 and math.abs(x) < halfX - 22 and z < W.plotRowZ + W.plotSize.Y / 2 + 2
 	local run = math.abs(x) < gate + 14 and z < Config.Run.zoneCenter.Z + Config.Run.zoneSize.Y / 2 + 16
-	return plots or run
+	-- casa de feitiçaria no centro (Sanctum.luau), com folga em volta
+	local sanctum = Config.Sanctum
+	local house = math.abs(x - sanctum.center.X) < sanctum.clear * sanctum.scale and math.abs(z - sanctum.center.Y) < sanctum.clear * sanctum.scale
+	return plots or run or house
 end
 
 -- Fundo: colinas grandes em três lados e meio, com árvores, pinheiros e cogumelos gigantes em cima.
@@ -363,6 +366,9 @@ function Scenery.build(): number
 	folder.Name = "Scenery"
 	local loaded = 0
 	for name, asset in Assets do
+		if name == "sanctum" or name == "potion_shop" or Config.MountById[name] then
+			continue -- a casa do centro é de Sanctum.luau e as montarias, de Mounts.luau
+		end
 		local template = loadTemplate(name, asset)
 		if template then
 			templates[name] = template

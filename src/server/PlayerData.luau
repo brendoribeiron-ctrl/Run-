@@ -20,7 +20,15 @@ export type Profile = {
 	index: { [string]: boolean }, -- personagens já obtidos
 	stats: { [string]: number }, -- nível de cada atributo de Config.Stats
 	unlocks: { [string]: boolean }, -- automáticos de Config.Auto já liberados
-	aura: string, -- id da aura equipada (Config.Auras)
+	aura: string, -- id da aura equipada (Config.Auras); "" = nenhuma
+	slots: number, -- quantos pedestais do terreno estão liberados
+	levels: { [string]: number }, -- nível de cada personagem (vale para todas as cópias)
+	mounts: { [string]: boolean }, -- montarias de Config.Mounts já compradas
+	mount: string, -- id da montaria equipada ("" = a pé)
+	rebirths: number,
+	boosts: { [string]: number }, -- poções: id -> hora (do servidor) em que acaba
+	daily: { streak: number, last: number }, -- recompensa diária: dia da sequência e o dia do último resgate
+	quests: { day: number, progress: { [string]: number }, claimed: { [string]: boolean } },
 }
 
 type Session = {
@@ -46,7 +54,15 @@ local function defaults(): Profile
 		index = {},
 		stats = {},
 		unlocks = {},
-		aura = Config.Auras[1].id,
+		aura = "",
+		slots = Config.Plot.freePedestals,
+		levels = {},
+		mounts = {},
+		mount = "",
+		rebirths = 0,
+		boosts = {},
+		daily = { streak = 0, last = 0 },
+		quests = { day = 0, progress = {}, claimed = {} },
 	}
 end
 
@@ -72,12 +88,58 @@ local function sanitize(raw: any): Profile
 			end
 		end
 	end
+	if type(raw.slots) == "number" then
+		profile.slots = math.clamp(math.floor(raw.slots), Config.Plot.freePedestals, #Config.Plot.pedestals)
+	end
+	if type(raw.levels) == "table" then
+		for id, level in raw.levels do
+			if Config.CharacterById[id] and type(level) == "number" then
+				profile.levels[id] = math.clamp(math.floor(level), 1, Config.Fighter.maxLevel)
+			end
+		end
+	end
+	if type(raw.rebirths) == "number" then
+		profile.rebirths = math.clamp(math.floor(raw.rebirths), 0, Config.Rebirth.max)
+	end
+	if type(raw.boosts) == "table" then
+		for id in Config.PotionById do
+			if type(raw.boosts[id]) == "number" then
+				profile.boosts[id] = raw.boosts[id]
+			end
+		end
+	end
+	if type(raw.daily) == "table" and type(raw.daily.streak) == "number" and type(raw.daily.last) == "number" then
+		profile.daily = { streak = math.clamp(math.floor(raw.daily.streak), 0, Config.Daily.days), last = math.floor(raw.daily.last) }
+	end
+	if type(raw.quests) == "table" and type(raw.quests.day) == "number" then
+		profile.quests.day = math.floor(raw.quests.day)
+		for id, quest in Config.QuestById do
+			local progress = type(raw.quests.progress) == "table" and raw.quests.progress[id]
+			if type(progress) == "number" then
+				profile.quests.progress[id] = math.clamp(math.floor(progress), 0, quest.goal)
+			end
+			if type(raw.quests.claimed) == "table" and raw.quests.claimed[id] == true then
+				profile.quests.claimed[id] = true
+			end
+		end
+	end
+	if type(raw.mounts) == "table" then
+		for _, info in Config.Mounts do
+			if raw.mounts[info.id] == true then
+				profile.mounts[info.id] = true
+			end
+		end
+	end
+	if type(raw.mount) == "string" and profile.mounts[raw.mount] then
+		profile.mount = raw.mount
+	end
 	if type(raw.pedestals) == "table" then
 		for key, entry in raw.pedestals do
 			local slot = tonumber(key)
-			local info = slot and Config.Plot.pedestals[slot]
-			if info and not info.locked and type(entry) == "table" and Config.CharacterById[entry.id] then
-				profile.pedestals[tostring(slot)] = { id = entry.id, level = if type(entry.level) == "number" then math.max(1, math.floor(entry.level)) else 1 }
+			if slot and Config.Plot.pedestals[slot] and type(entry) == "table" and Config.CharacterById[entry.id] then
+				profile.pedestals[tostring(slot)] = { id = entry.id, level = 1 }
+				-- save antigo com personagem num pedestal que hoje é pago: o pedestal continua dele
+				profile.slots = math.max(profile.slots, slot)
 			end
 		end
 	end
@@ -96,7 +158,8 @@ local function sanitize(raw: any): Profile
 			end
 		end
 	end
-	if type(raw.aura) == "string" and Config.AuraById[raw.aura] then
+	-- só vale a aura que o Poder já alcança (saves antigos começavam com a primeira equipada)
+	if type(raw.aura) == "string" and Config.AuraById[raw.aura] and profile.power >= Config.AuraById[raw.aura].power then
 		profile.aura = raw.aura
 	end
 	if type(raw.unlocks) == "table" then
@@ -140,6 +203,40 @@ local function mirror(player: Player, profile: Profile)
 		player:SetAttribute("Auto_" .. name, profile.unlocks[name] == true)
 	end
 	player:SetAttribute("Aura", profile.aura)
+	player:SetAttribute("Pedestals", profile.slots)
+	player:SetAttribute("Rebirths", profile.rebirths)
+	-- poções: "id:fim,id:fim" (hora do servidor em que cada uma acaba)
+	local boosts = {}
+	for _, info in Config.Potions.list do
+		if profile.boosts[info.id] then
+			table.insert(boosts, info.id .. ":" .. math.floor(profile.boosts[info.id]))
+		end
+	end
+	player:SetAttribute("Boosts", table.concat(boosts, ","))
+	player:SetAttribute("Daily", profile.daily.streak .. ":" .. profile.daily.last)
+	-- missões: "dia|id:progresso:resgatada,..."
+	local quests = {}
+	for _, quest in Config.Quests do
+		table.insert(quests, `{quest.id}:{profile.quests.progress[quest.id] or 0}:{if profile.quests.claimed[quest.id] then 1 else 0}`)
+	end
+	player:SetAttribute("Quests", profile.quests.day .. "|" .. table.concat(quests, ","))
+	local owned = {}
+	for _, info in Config.Mounts do
+		if profile.mounts[info.id] then
+			table.insert(owned, info.id)
+		end
+	end
+	player:SetAttribute("Mounts", table.concat(owned, ","))
+	player:SetAttribute("Mount", profile.mount)
+	-- níveis acima de 1, como "id:nível,id:nível" (a janela INDEX lê daqui)
+	local levels = {}
+	for _, info in Config.Characters do
+		local level = profile.levels[info.id]
+		if level and level > 1 then
+			table.insert(levels, info.id .. ":" .. level)
+		end
+	end
+	player:SetAttribute("Levels", table.concat(levels, ","))
 end
 
 function PlayerData.load(player: Player): boolean
@@ -182,6 +279,17 @@ function PlayerData.update(player: Player, change: (Profile) -> ())
 		return
 	end
 	change(session.profile)
+	session.dirty = true
+	mirror(player, session.profile)
+end
+
+-- Volta o perfil ao de um jogador novo (comando de admin /reset).
+function PlayerData.reset(player: Player)
+	local session = sessions[player]
+	if not session then
+		return
+	end
+	session.profile = defaults()
 	session.dirty = true
 	mirror(player, session.profile)
 end

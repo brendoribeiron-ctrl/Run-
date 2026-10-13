@@ -61,17 +61,21 @@ for _, name in { "Shop", "Rebirth", "Daily", "Playtime" } do
 end
 
 -- caminhada: no primeiro segundo andando os ombros vão para trás; depois a corrida assume
-character:PivotTo(CFrame.new(-60, 4, 20))
+check("mochila tem o botão de vender", string.find(ui().backpackSell, "SELL", 1, true) ~= nil, tostring(ui().backpackSell))
+character:PivotTo(CFrame.new(-60, 4, 38)) -- faixa livre entre a casa do centro e os terrenos
 task.wait(1.2)
 local idle = ui("arms", 0.4)
 local from = root.Position
-ui("walk", { direction = Vector3.xAxis, seconds = 3 })
+-- anda por mais tempo que as medições levam: com o jogo pesado, as chamadas ao cliente
+-- demoram e a medição da corrida caía depois de o boneco já ter parado
+ui("walk", { direction = Vector3.xAxis, seconds = 6 })
 task.wait(0.3)
 local walking = ui("arms", 0.45)
 task.wait(1.5)
 local sprinting = ui("arms", 0.4)
-task.wait(1)
 local walked = (root.Position - from).Magnitude
+ui("walk", { direction = Vector3.xAxis, seconds = 0 })
+task.wait(0.5)
 local detail = string.format(
 	"andou %.0f studs | parado %.1f | andando %.1f (peso %.2f, mov %.1f, chão %s, vel %.0f) | correndo %.1f (peso %.2f, sprint %.2f, vel %.0f)",
 	walked, idle.pitch, walking.pitch, walking.walkArms, walking.moving, walking.floor, walking.speed, sprinting.pitch, sprinting.walkArms, sprinting.sprint, sprinting.speed

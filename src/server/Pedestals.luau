@@ -1,5 +1,6 @@
 --!strict
--- Pedestais do terreno: colocar e recolher personagens, renda por segundo e coleta no pad verde.
+-- Pedestais do terreno: liberar com dinheiro, colocar e recolher personagens, subir o nível
+-- deles, renda por segundo e coleta de tudo num botão só.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -8,6 +9,7 @@ local CharacterModels = require(ReplicatedStorage.Shared.CharacterModels)
 local Config = require(ReplicatedStorage.Shared.Config)
 local Format = require(ReplicatedStorage.Shared.Format)
 local PlayerData = require(script.Parent.PlayerData)
+local Progress = require(script.Parent.Progress)
 local State = require(script.Parent.State)
 
 local P = Config.Palette
@@ -18,9 +20,19 @@ local function pedestalOf(plot: Model, slot: number): Model?
 	return if found and found:IsA("Model") then found else nil
 end
 
-local function setCashLabel(pedestal: Model, amount: number)
-	local cash = pedestal:FindFirstChild("CashPad")
-	local gui = cash and cash:FindFirstChild("Gui")
+-- Soma do que todos os pedestais do jogador guardam.
+local function total(profile: PlayerData.Profile): number
+	local sum = 0
+	for _, amount in profile.stored do
+		sum += amount
+	end
+	return sum
+end
+
+-- Valor mostrado no botão de coleta do terreno.
+local function setCashLabel(plot: Model, amount: number)
+	local pad = plot:FindFirstChild("Collect")
+	local gui = pad and pad:FindFirstChild("Gui")
 	local text = gui and gui:FindFirstChild("Amount")
 	if text and text:IsA("TextLabel") then
 		text.Text = "$" .. Format.abbreviate(amount)
@@ -43,8 +55,13 @@ local function line(parent: Instance, text: string, color: Color3, height: numbe
 	t.Parent = parent
 end
 
--- Mostra (ou limpa, com entry = nil) o que está no pedestal.
-local function render(plot: Model, slot: number, entry: { id: string, level: number }?, stored: number)
+local function levelOf(profile: PlayerData.Profile, id: string): number
+	return profile.levels[id] or 1
+end
+
+-- Mostra o estado do pedestal para o dono do terreno: trancado (com o preço no próximo a
+-- liberar), vazio ou com o personagem. Sem perfil (terreno sem dono), fica vazio e desligado.
+local function render(plot: Model, slot: number, profile: PlayerData.Profile?)
 	local pedestal = pedestalOf(plot, slot)
 	if not pedestal then
 		return
@@ -54,26 +71,39 @@ local function render(plot: Model, slot: number, entry: { id: string, level: num
 		old:Destroy()
 	end
 	local pad = pedestal.PrimaryPart :: BasePart
-	local prompt = pad:FindFirstChild("Prompt")
-	local cash = pedestal:FindFirstChild("CashPad")
-	local gui = cash and cash:FindFirstChild("Gui")
-	if cash and cash:IsA("BasePart") then
-		cash.Transparency = if entry then 0 else 1
+	local prompt = pad:FindFirstChild("Prompt") :: ProximityPrompt
+	local upgrade = pad:FindFirstChild("Upgrade") :: ProximityPrompt
+	local lock = pad:FindFirstChild("Lock") :: BillboardGui
+	local rim = pedestal:FindFirstChild("Rim") :: BasePart
+
+	local key = tostring(slot)
+	local entry = profile and profile.pedestals[key]
+	local locked = profile ~= nil and slot > profile.slots
+	local nextToUnlock = profile ~= nil and slot == profile.slots + 1
+	local cost = Config.Plot.pedestals[slot].cost
+
+	rim.Color = if locked then P.red else P.cyan
+	lock.Enabled = locked
+	local price = lock:FindFirstChild("Price")
+	if price and price:IsA("TextLabel") then
+		price.Text = if nextToUnlock then "$" .. Format.abbreviate(cost) else ""
 	end
-	if gui and gui:IsA("SurfaceGui") then
-		gui.Enabled = entry ~= nil
-	end
-	if prompt and prompt:IsA("ProximityPrompt") then
-		prompt.ActionText = if entry then "Pick Up" else "Place"
-	end
-	if not entry then
+	prompt.Enabled = profile ~= nil and (not locked or nextToUnlock)
+	prompt.ActionText = if locked then `Unlock ${Format.abbreviate(cost)}` elseif entry then "Pick Up" else "Place"
+	upgrade.Enabled = false
+	if not profile or not entry then
 		return
 	end
 
 	local info = Config.CharacterById[entry.id]
+	local level = levelOf(profile, entry.id)
+	local maxed = level >= Config.Fighter.maxLevel
+	upgrade.Enabled = not maxed
+	upgrade.ActionText = if maxed then "MAX" else `Level Up ${Format.abbreviate(Config.fighterCost(entry.id, level))}`
+
 	local model = CharacterModels.build(entry.id, 1.5)
 	model.Name = "Character"
-	model:PivotTo(CFrame.new(pad.Position + Vector3.new(0, pad.Size.Y / 2, 0)))
+	model:PivotTo(CFrame.new(pad.Position + Vector3.new(0, pad.Size.X / 2, 0))) -- cilindro em pé: X é a altura
 
 	local head = model:FindFirstChild("Head") :: BasePart
 	local board = Instance.new("BillboardGui")
@@ -87,43 +117,71 @@ local function render(plot: Model, slot: number, entry: { id: string, level: num
 	list.Parent = board
 	line(board, info.name, Color3.fromRGB(255, 255, 255), 0.36, 1)
 	line(board, string.upper(Config.Rarities[info.rarity].id), Config.Rarities[info.rarity].color, 0.28, 2)
-	line(board, `Lv {entry.level}  ${Format.abbreviate(info.income * entry.level)}/s`, P.money, 0.34, 3)
+	line(board, `Lv {level}{if maxed then " MAX" else ""}  ${Format.abbreviate(Config.fighterIncome(entry.id, level))}/s`, P.money, 0.34, 3)
 	board.Parent = model
 
 	model.Parent = pedestal
-	setCashLabel(pedestal, stored)
 end
 
-local function collect(player: Player, slot: number)
+-- Recolhe de uma vez o dinheiro guardado em todos os pedestais. Devolve quanto pagou.
+function Pedestals.collect(player: Player): number
 	local profile = PlayerData.get(player)
 	local plot = State.plot(player)
-	local key = tostring(slot)
 	if not profile or not plot then
-		return
+		return 0
 	end
-	local amount = profile.stored[key] or 0
-	if amount <= 0 or not profile.pedestals[key] then
-		return
+	local amount = total(profile)
+	if amount <= 0 then
+		return 0
 	end
 	PlayerData.update(player, function(p)
 		p.money += amount
-		p.stored[key] = 0
+		for key in p.stored do
+			p.stored[key] = 0
+		end
 	end)
-	local pedestal = pedestalOf(plot, slot)
-	if pedestal then
-		setCashLabel(pedestal, 0)
-		local cash = pedestal:FindFirstChild("CashPad") :: BasePart
-		State.remotes.Fx:FireClient(player, "collected", amount, cash.Position)
+	setCashLabel(plot, 0)
+	Progress.count(player, "collect", amount)
+	local pad = plot:FindFirstChild("Collect")
+	if pad and pad:IsA("BasePart") then
+		State.remotes.Fx:FireClient(player, "collected", amount, pad.Position)
 	end
+	return amount
 end
 
--- Coloca o personagem selecionado no pedestal, ou recolhe o que já está lá.
+-- Libera o próximo pedestal trancado, cobrando o preço dele.
+local function unlock(player: Player, profile: PlayerData.Profile, plot: Model, slot: number): string?
+	if slot ~= profile.slots + 1 then
+		State.remotes.Fx:FireClient(player, "toast", "Unlock the previous pedestal first!")
+		return nil
+	end
+	local cost = Config.Plot.pedestals[slot].cost
+	if profile.money < cost then
+		State.remotes.Fx:FireClient(player, "toast", `Need ${Format.abbreviate(cost)}!`)
+		return nil
+	end
+	PlayerData.update(player, function(p)
+		p.money -= cost
+		p.slots = slot
+	end)
+	render(plot, slot, profile)
+	if Config.Plot.pedestals[slot + 1] then
+		render(plot, slot + 1, profile) -- o seguinte passa a mostrar o preço
+	end
+	local pad = (pedestalOf(plot, slot) :: Model).PrimaryPart :: BasePart
+	State.remotes.Fx:FireClient(player, "reveal", `PEDESTAL {slot} UNLOCKED!`, P.cyan, pad.Position + Vector3.new(0, 3, 0))
+	return "unlocked"
+end
+
+-- Libera o pedestal trancado, coloca o personagem selecionado, ou recolhe o que já está lá.
 function Pedestals.interact(player: Player, slot: number): string?
 	local profile = PlayerData.get(player)
 	local plot = State.plot(player)
-	local info = Config.Plot.pedestals[slot]
-	if not profile or not plot or not info or info.locked then
+	if not profile or not plot or not Config.Plot.pedestals[slot] then
 		return nil
+	end
+	if slot > profile.slots then
+		return unlock(player, profile, plot, slot)
 	end
 	local key = tostring(slot)
 	local entry = profile.pedestals[key]
@@ -133,14 +191,15 @@ function Pedestals.interact(player: Player, slot: number): string?
 			State.remotes.Fx:FireClient(player, "toast", "Backpack is full!")
 			return nil
 		end
-		collect(player, slot)
 		PlayerData.update(player, function(p)
+			p.money += p.stored[key] or 0 -- o que este pedestal guardava vai junto
 			p.pedestals[key] = nil
 			p.stored[key] = nil
 			table.insert(p.inventory, entry.id)
 		end)
 		player:SetAttribute("Selected", #profile.inventory)
-		render(plot, slot, nil, 0)
+		render(plot, slot, profile)
+		setCashLabel(plot, total(profile))
 		return "picked"
 	end
 
@@ -159,12 +218,45 @@ function Pedestals.interact(player: Player, slot: number): string?
 		p.stored[key] = 0
 	end)
 	player:SetAttribute("Selected", math.min(selected, #profile.inventory))
-	render(plot, slot, profile.pedestals[key], 0)
+	render(plot, slot, profile)
 	local pedestal = pedestalOf(plot, slot)
 	if pedestal then
 		State.remotes.Fx:FireAllClients("placed", pedestal)
 	end
 	return "placed"
+end
+
+-- Sobe um nível do personagem que está no pedestal. O nível é do personagem (todas as cópias
+-- dele sobem junto) e continua valendo depois de recolher.
+function Pedestals.upgrade(player: Player, slot: number): boolean
+	local profile = PlayerData.get(player)
+	local plot = State.plot(player)
+	local entry = profile and profile.pedestals[tostring(slot)]
+	if not profile or not plot or not entry then
+		return false
+	end
+	local level = levelOf(profile, entry.id)
+	if level >= Config.Fighter.maxLevel then
+		return false
+	end
+	local cost = Config.fighterCost(entry.id, level)
+	if profile.money < cost then
+		State.remotes.Fx:FireClient(player, "toast", `Need ${Format.abbreviate(cost)}!`)
+		return false
+	end
+	PlayerData.update(player, function(p)
+		p.money -= cost
+		p.levels[entry.id] = level + 1
+	end)
+	-- todas as cópias dele nos outros pedestais mostram o nível novo
+	for key, other in profile.pedestals do
+		if other.id == entry.id then
+			render(plot, tonumber(key) :: number, profile)
+		end
+	end
+	local pad = (pedestalOf(plot, slot) :: Model).PrimaryPart :: BasePart
+	State.remotes.Fx:FireClient(player, "reveal", `{string.upper(Config.CharacterById[entry.id].name)} Lv {level + 1}!`, P.money, pad.Position + Vector3.new(0, 6, 0))
+	return true
 end
 
 -- Liga os pedestais do terreno ao dono que acabou de entrar.
@@ -173,26 +265,17 @@ function Pedestals.attach(player: Player, plot: Model)
 	if not profile then
 		return
 	end
-	for slot, info in Config.Plot.pedestals do
-		local pedestal = pedestalOf(plot, slot)
-		local prompt = pedestal and pedestal.PrimaryPart and pedestal.PrimaryPart:FindFirstChild("Prompt")
-		if prompt and prompt:IsA("ProximityPrompt") then
-			prompt.Enabled = not info.locked
-		end
-		local key = tostring(slot)
-		render(plot, slot, profile.pedestals[key], profile.stored[key] or 0)
+	for slot in Config.Plot.pedestals do
+		render(plot, slot, profile)
 	end
+	setCashLabel(plot, total(profile))
 end
 
 function Pedestals.detach(plot: Model)
 	for slot in Config.Plot.pedestals do
-		local pedestal = pedestalOf(plot, slot)
-		local prompt = pedestal and pedestal.PrimaryPart and pedestal.PrimaryPart:FindFirstChild("Prompt")
-		if prompt and prompt:IsA("ProximityPrompt") then
-			prompt.Enabled = false
-		end
-		render(plot, slot, nil, 0)
+		render(plot, slot, nil)
 	end
+	setCashLabel(plot, 0)
 end
 
 -- Um segundo de renda para todos os jogadores.
@@ -201,26 +284,22 @@ function Pedestals.tick()
 		local profile = PlayerData.get(player)
 		local plot = State.plots[id]
 		if profile and next(profile.pedestals) then
+			local boost = Progress.moneyBoost(player, profile) -- rebirths e poção de dinheiro
 			PlayerData.update(player, function(p)
 				for key, entry in p.pedestals do
-					p.stored[key] = (p.stored[key] or 0) + Config.CharacterById[entry.id].income * entry.level
+					p.stored[key] = (p.stored[key] or 0) + math.floor(Config.fighterIncome(entry.id, levelOf(p, entry.id)) * boost)
 				end
 			end)
-			for key in profile.pedestals do
-				local pedestal = pedestalOf(plot, tonumber(key) :: number)
-				if pedestal then
-					setCashLabel(pedestal, profile.stored[key])
-				end
-			end
+			setCashLabel(plot, total(profile))
 		end
 	end
 end
 
 function Pedestals.connect()
 	for id, plot in State.plots do
-		for slot, info in Config.Plot.pedestals do
+		for slot in Config.Plot.pedestals do
 			local pedestal = pedestalOf(plot, slot)
-			if not pedestal or info.locked then
+			if not pedestal then
 				continue
 			end
 			local pad = pedestal.PrimaryPart :: BasePart
@@ -230,14 +309,20 @@ function Pedestals.connect()
 					Pedestals.interact(player, slot)
 				end
 			end)
-			local cash = pedestal:FindFirstChild("CashPad") :: BasePart
-			cash.Touched:Connect(function(hit)
-				local player = Players:GetPlayerFromCharacter(hit.Parent)
-				if player and State.owners[id] == player then
-					collect(player, slot)
+			local upgrade = pad:FindFirstChild("Upgrade") :: ProximityPrompt
+			upgrade.Triggered:Connect(function(player)
+				if State.owners[id] == player then
+					Pedestals.upgrade(player, slot)
 				end
 			end)
 		end
+		local pad = plot:FindFirstChild("Collect") :: BasePart
+		pad.Touched:Connect(function(hit)
+			local player = Players:GetPlayerFromCharacter(hit.Parent)
+			if player and State.owners[id] == player then
+				Pedestals.collect(player)
+			end
+		end)
 	end
 
 	State.remotes.Select.OnServerEvent:Connect(function(player, index)

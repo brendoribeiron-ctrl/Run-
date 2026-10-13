@@ -54,5 +54,21 @@
 	"tree_round": {
 		"assetId": "73502784621556",
 		"hash": "fd9656ffd9d3645560725efc19a816afaf2f59e5"
+	},
+	"sanctum": {
+		"assetId": "102958302980438",
+		"hash": "1a6a1bcc1ba1cacf68f0ec17179f3209ae7452f6"
+	},
+	"carpet": {
+		"assetId": "102145025705012",
+		"hash": "defc72e6ebf8137811d19b0a85587a5c30026652"
+	},
+	"hoverboard": {
+		"assetId": "103140580229735",
+		"hash": "cd44e995844cb773c1408c88c854736a9b193117"
+	},
+	"potion_shop": {
+		"assetId": "111159887348002",
+		"hash": "e45a13b12c1de4e0241ad9a78d44f1a164b2daae"
 	}
 }

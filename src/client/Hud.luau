@@ -213,7 +213,14 @@ local function buildStats(root: ScreenGui): (Instance, Instance)
 
 	local friend = Ui.frame(block, "FriendBoost", UDim2.fromOffset(300, 24))
 	friend.LayoutOrder = 4
-	Ui.text(friend, { name = "Label", text = "FRIEND BOOST +0%", size = UDim2.fromOffset(190, 24), textSize = 19, stroke = 3, align = Enum.TextXAlignment.Left })
+	local friendLabel = Ui.text(friend, { name = "Label", text = "FRIEND BOOST +0%", size = UDim2.fromOffset(190, 24), textSize = 19, stroke = 3, align = Enum.TextXAlignment.Left })
+	-- +10% de Poder por amigo no mesmo servidor (o servidor calcula e replica)
+	local function refreshFriends()
+		local boost = player:GetAttribute("FriendBoost")
+		friendLabel.Text = `FRIEND BOOST +{math.floor((if type(boost) == "number" then boost else 0) * 100 + 0.5)}%`
+	end
+	player:GetAttributeChangedSignal("FriendBoost"):Connect(refreshFriends)
+	refreshFriends()
 	local bar = Ui.frame(friend, "Bar", UDim2.fromOffset(70, 10), UDim2.fromOffset(196, 8), Color3.fromRGB(30, 34, 54))
 	Ui.corner(bar, 5)
 	Ui.border(bar, 2)
@@ -244,6 +251,14 @@ local function buildTopRight(root: ScreenGui)
 	if not root:FindFirstChild("GoZoneButton", true) then
 		local go = squareButton(block, "GoZoneButton", "🏁", "CORRER", Color3.fromRGB(150, 255, 150), Color3.fromRGB(40, 190, 70), 0)
 		go.Position = UDim2.fromOffset(10, 128)
+	end
+	if not root:FindFirstChild("RankButton", true) then
+		local rank = squareButton(block, "RankButton", "🏆", "PLAYERS", Color3.fromRGB(255, 225, 120), Color3.fromRGB(230, 140, 20), 0)
+		rank.Position = UDim2.fromOffset(106, 384)
+	end
+	if not root:FindFirstChild("MountButton", true) then
+		local mount = squareButton(block, "MountButton", "🛹", "MOUNTS", Color3.fromRGB(140, 235, 255), Color3.fromRGB(30, 140, 230), 0)
+		mount.Position = UDim2.fromOffset(10, 256)
 	end
 	if not root:FindFirstChild("AuraButton", true) then
 		local aura = squareButton(block, "AuraButton", "✨", "AURAS", Color3.fromRGB(200, 150, 255), Color3.fromRGB(120, 50, 220), 0)
