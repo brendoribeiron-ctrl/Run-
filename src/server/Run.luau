@@ -35,9 +35,10 @@ local function inZone(player: Player): boolean
 		return false
 	end
 	local run = Config.Run
+	local zone = Config.zoneCenter(State.world(player))
 	local margin = 4
-	return math.abs(root.Position.X - run.zoneCenter.X) <= run.zoneSize.X / 2 + margin
-		and math.abs(root.Position.Z - run.zoneCenter.Z) <= run.zoneSize.Y / 2 + margin
+	return math.abs(root.Position.X - zone.X) <= run.zoneSize.X / 2 + margin
+		and math.abs(root.Position.Z - zone.Z) <= run.zoneSize.Y / 2 + margin
 end
 
 function Run.isBusy(player: Player): boolean
@@ -45,14 +46,16 @@ function Run.isBusy(player: Player): boolean
 end
 
 -- Raridade a partir do tier da última parede quebrada; depois um personagem daquela raridade.
--- luckBoost multiplica a sorte da parede (poção de sorte).
-function Run.rollCharacter(broken: number, luckBoost: number?): string
+-- luckBoost multiplica a sorte da parede (poção de sorte). world = o mundo da pista: decide as
+-- paredes e a versão do personagem (sem isso, mundo 1).
+function Run.rollCharacter(broken: number, luckBoost: number?, world: any?): string
+	local place = world or Config.Worlds[1]
 	local tier, luck = 1, 1
 	local weights: { number } = table.create(#Config.Rarities, 0)
 	if broken == 0 then
 		weights[1] = 1
 	else
-		local wall = Config.Walls[broken]
+		local wall = place.walls[broken]
 		tier, luck = wall.tier, wall.luck * (luckBoost or 1)
 		local roll = Config.Roll
 		local lower = if tier > 1 then tier - 1 else tier
@@ -82,7 +85,7 @@ function Run.rollCharacter(broken: number, luckBoost: number?): string
 			table.insert(pool, info.id)
 		end
 	end
-	return pool[rng:NextInteger(1, #pool)]
+	return pool[rng:NextInteger(1, #pool)] .. place.suffix
 end
 
 function Run.start(player: Player): boolean
@@ -128,10 +131,10 @@ function Run.finish(player: Player)
 	if session.reward then
 		grant(player, session.reward)
 	end
-	local plot = State.plot(player)
+	local home = State.homeCFrame(player)
 	local character = player.Character
-	if plot and character and character.Parent then
-		character:PivotTo(State.spawnCFrame(plot))
+	if home and character and character.Parent then
+		character:PivotTo(home)
 	end
 end
 
@@ -150,9 +153,10 @@ function Run.release(player: Player, chargeOverride: number?): Result?
 		return nil
 	end
 
-	local broken = RunMath.wallsBroken(RunMath.effectivePower(profile.power, charge))
-	local runTime = RunMath.stopStuds(broken) / run.speed
-	local characterId = Run.rollCharacter(broken, Progress.luckBoost(player, profile))
+	local world = State.world(player)
+	local broken = RunMath.wallsBroken(RunMath.effectivePower(profile.power, charge), world.walls)
+	local runTime = RunMath.stopStuds(broken, world.walls) / run.speed
+	local characterId = Run.rollCharacter(broken, Progress.luckBoost(player, profile), world)
 	Progress.count(player, "walls", broken)
 	local result: Result = {
 		charge = charge,

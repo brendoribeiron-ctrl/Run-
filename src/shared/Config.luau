@@ -68,6 +68,17 @@ Config.Bag = {
 		{ power = 165, cost = 450_000 },
 		{ power = 235, cost = 900_000 },
 		{ power = 330, cost = 1_800_000 },
+		-- daqui para cima só se paga com a renda dos personagens de magma (mundo 2)
+		{ power = 500, cost = 4_000_000 },
+		{ power = 800, cost = 9_000_000 },
+		{ power = 1_300, cost = 20_000_000 },
+		{ power = 2_200, cost = 45_000_000 },
+		{ power = 3_600, cost = 100_000_000 },
+		{ power = 6_000, cost = 220_000_000 },
+		{ power = 10_000, cost = 500_000_000 },
+		{ power = 16_000, cost = 1_100_000_000 },
+		{ power = 26_000, cost = 2_500_000_000 },
+		{ power = 42_000, cost = 5_500_000_000 },
 	},
 }
 
@@ -211,6 +222,77 @@ Config.Walls = {
 	{ tier = 6, distance = 3600, power = 1_200_000, luck = 7 },
 	{ tier = 6, distance = 4000, power = 2_500_000, luck = 10 },
 }
+
+-- Paredes do mundo 2 (vulcão): mesmas distâncias, Poder de onde o mundo 1 termina para cima.
+Config.VolcanoWalls = {
+	{ tier = 1, distance = 200, power = 5_000_000, luck = 1 },
+	{ tier = 1, distance = 400, power = 10_000_000, luck = 1.2 },
+	{ tier = 2, distance = 800, power = 22_000_000, luck = 1.5 },
+	{ tier = 2, distance = 1200, power = 50_000_000, luck = 1.8 },
+	{ tier = 3, distance = 1400, power = 110_000_000, luck = 2.2 },
+	{ tier = 3, distance = 1800, power = 240_000_000, luck = 2.6 },
+	{ tier = 4, distance = 2200, power = 500_000_000, luck = 3.2 },
+	{ tier = 4, distance = 2400, power = 900_000_000, luck = 3.8 },
+	{ tier = 5, distance = 2800, power = 1_600_000_000, luck = 4.5 },
+	{ tier = 5, distance = 3200, power = 2_600_000_000, luck = 5.5 },
+	{ tier = 6, distance = 3600, power = 3_800_000_000, luck = 7 },
+	{ tier = 6, distance = 4000, power = 5_000_000_000, luck = 10 },
+}
+
+-- Mundos. O 1 é o gramado. Os seguintes ficam longe, em `offset`, com a mesma planta: a zona de
+-- carga e a pista ficam onde ficam as do mundo 1, somadas ao offset. O jogador mora no mundo 1
+-- (terreno, saco, pedestais) e viaja para correr nas pistas dos outros.
+--   rebirths = quantos rebirths o feiticeiro da casa de feitiçaria exige para deixar passar
+--   suffix   = os personagens sorteados nesse mundo são a versão com este sufixo (ver o fim
+--              deste arquivo); incomeMultiplier = quanto a renda deles vale a mais
+--   hallway  = nome da pasta da pista no Workspace (o cliente procura as paredes nela)
+Config.Worlds = {
+	{ id = 1, name = "MEADOW", rebirths = 0, offset = Vector3.zero, walls = Config.Walls, hallway = "Hallway", suffix = "", incomeMultiplier = 1, color = Color3.fromRGB(63, 196, 30) },
+	{ id = 2, name = "VOLCANO", rebirths = 3, offset = Vector3.new(9000, 0, 0), walls = Config.VolcanoWalls, hallway = "VolcanoHallway", suffix = "_magma", incomeMultiplier = 20, prefix = "Magma ", color = Color3.fromRGB(255, 110, 30) },
+}
+
+-- Mundo em que o jogador está agora (atributo "World", posto pelo servidor).
+function Config.worldOf(player: Player): any
+	local id = player:GetAttribute("World")
+	return Config.Worlds[if type(id) == "number" then id else 1] or Config.Worlds[1]
+end
+
+function Config.zoneCenter(world: any): Vector3
+	return Config.Run.zoneCenter + world.offset
+end
+
+-- Vulcão (src/server/Volcano.luau; modelos em tools/blender/volcano.py). Posições relativas
+-- ao offset do mundo, nos mesmos eixos do mundo 1 (a pista segue em -Z).
+Config.Volcano = {
+	islandCenter = Vector3.new(0, 0, -60), -- centro da ilha de chegada
+	islandRadius = 85,
+	arrive = Vector3.new(0, 4, -42), -- onde o jogador aparece, olhando para o portão
+	gateZ = -150, -- o portão e o começo da pista
+	segment = 50, -- comprimento de cada trecho da pista (igual ao passo das paredes)
+	cliff = 24.5, -- distância do centro da pista ao pé dos paredões
+	portal = Vector3.new(0, 0, 2), -- portal de volta, do outro lado da ilha
+	portalRange = 16,
+	lavaY = -7, -- nível do mar de lava
+	seaSize = 4096,
+	mount = Vector3.new(0, -12, 520), -- o vulcão do fundo, atrás da ilha
+	mountScale = 1.5,
+	spires = 46, -- agulhas de rocha espalhadas pelo mar de lava
+	seed = 21,
+}
+
+-- O feiticeiro da casa de feitiçaria (src/server/Wizard.luau; modelo em tools/blender/wizard.py):
+-- guarda a passagem para os outros mundos.
+Config.Wizard = {
+	name = "ARCHMAGE ORIN",
+	offset = Vector2.new(14, 14), -- X, Z a partir do centro da casa
+	height = 10.5, -- altura do modelo no jogo, em studs
+	hover = 0.9, -- quanto ele flutua acima do piso
+	range = 13, -- distância para o aviso de conversar aparecer
+	travelRange = 40, -- o servidor só aceita a viagem com o jogador até esta distância dele
+}
+
+-- Modelos de Shared.Assets que não são cenário espalhado (cada um tem o próprio módulo).
+Config.StructureAssets = { sanctum = true, potion_shop = true, wizard = true, volcano_base = true, volcano_track = true, volcano_mount = true, volcano_spire = true }
 
 -- Sorteio: pesos em relação ao tier da última parede quebrada.
 Config.Roll = {
@@ -444,19 +526,25 @@ Config.Friends = { perFriend = 0.1, max = 0.5 }
 -- super soco). Bônus pequeno de propósito. followTier = a cor acompanha o tier do Poder em vez
 -- de usar `color`.
 --
--- Desenho de cada uma (src/client/Aura.luau): rings = quantos anéis de arcos girando (com o
--- Poder cheio), spin = ritmo do giro, accent = cor de destaque dos arcos e das estrelas,
--- halo = anel fino de luz por fora, extra = efeito a mais: "none", "snow" (flocos caindo),
--- "bubbles" (gotas subindo), "lightning" (raios), "rays" (clarões de estrela), "void" (fumaça
--- escura sendo puxada para dentro).
+-- Desenho de cada uma (src/client/Aura.luau, texturas em src/shared/Textures.luau):
+--   accent = cor clara (miolo das labaredas, bordas);  second = cor das labaredas de trás
+--   flames = quanto fogo toon sobe do corpo (0 = quase nada, 1,4 = fogueira)
+--   orbit  = o que gira em volta: "ribbon" (faixas largas de luz), "slash" (cortes pretos de
+--            borda colorida), "thin" (fitas finas e rápidas);  rings = quantos anéis com o
+--            Poder cheio;  spin = ritmo;  orbitColor = cor das fitas, se não for a da aura
+--   ground = o que aparece no chão: "circle" (círculo mágico girando), "swirl" (vento em
+--            espiral abrindo), "both", "none"
+--   shards = lascas voando para fora
+--   extra  = "none", "snow" (flocos caindo), "bubbles" (gotas subindo), "pillars" (pilares
+--            de luz descendo do céu);  lightning = raios em volta do corpo
 Config.Auras = {
-	{ id = "ember", name = "EMBER", power = 1_000, multiplier = 1.03, color = rgb(255, 120, 20), followTier = true, rings = 1, spin = 0.85, halo = false, extra = "none" },
-	{ id = "spark", name = "SPARK", power = 5_000, multiplier = 1.06, color = rgb(255, 205, 60), accent = rgb(255, 245, 190), followTier = false, rings = 2, spin = 1, halo = true, extra = "none" },
-	{ id = "frost", name = "FROST", power = 20_000, multiplier = 1.1, color = rgb(90, 190, 255), accent = rgb(225, 245, 255), followTier = false, rings = 2, spin = 0.7, halo = true, extra = "snow" },
-	{ id = "venom", name = "VENOM", power = 80_000, multiplier = 1.15, color = rgb(90, 240, 70), accent = rgb(215, 255, 150), followTier = false, rings = 3, spin = 1.25, halo = false, extra = "bubbles" },
-	{ id = "storm", name = "STORM", power = 250_000, multiplier = 1.2, color = rgb(150, 90, 255), accent = rgb(225, 205, 255), followTier = false, rings = 3, spin = 1.5, halo = true, extra = "lightning" },
-	{ id = "solar", name = "SOLAR", power = 800_000, multiplier = 1.3, color = rgb(255, 96, 16), accent = rgb(255, 176, 60), followTier = false, rings = 4, spin = 1.15, halo = true, extra = "rays" },
-	{ id = "void", name = "VOID", power = 2_000_000, multiplier = 1.4, color = rgb(235, 40, 150), accent = rgb(255, 170, 235), followTier = false, rings = 4, spin = 1.7, halo = true, extra = "void" },
+	{ id = "ember", name = "EMBER", power = 1_000, multiplier = 1.03, color = rgb(255, 120, 20), followTier = true, flames = 0.75, orbit = "thin", rings = 1, spin = 0.85, ground = "none", shards = false, extra = "none" },
+	{ id = "spark", name = "SPARK", power = 5_000, multiplier = 1.06, color = rgb(255, 196, 30), accent = rgb(255, 240, 160), second = rgb(255, 120, 20), followTier = false, flames = 0.3, orbit = "ribbon", rings = 3, spin = 1, ground = "circle", shards = false, extra = "none" },
+	{ id = "frost", name = "FROST", power = 20_000, multiplier = 1.1, color = rgb(60, 140, 255), accent = rgb(215, 238, 255), second = rgb(140, 205, 255), followTier = false, flames = 1.25, orbit = "thin", rings = 2, spin = 0.7, ground = "circle", shards = true, extra = "snow" },
+	{ id = "venom", name = "VENOM", power = 80_000, multiplier = 1.15, color = rgb(90, 235, 60), accent = rgb(215, 255, 150), second = rgb(150, 60, 220), followTier = false, flames = 0.95, orbit = "thin", rings = 3, spin = 1.25, ground = "swirl", shards = false, extra = "bubbles" },
+	{ id = "storm", name = "STORM", power = 250_000, multiplier = 1.2, color = rgb(190, 150, 255), accent = rgb(255, 238, 252), second = rgb(255, 160, 225), followTier = false, flames = 0.3, orbit = "thin", rings = 2, spin = 1.4, ground = "swirl", shards = false, extra = "pillars", lightning = true },
+	{ id = "solar", name = "SOLAR", power = 800_000, multiplier = 1.3, color = rgb(255, 160, 20), accent = rgb(255, 232, 110), second = rgb(255, 70, 170), followTier = false, flames = 1.4, orbit = "thin", orbitColor = rgb(255, 40, 30), rings = 3, spin = 1.15, ground = "circle", shards = true, extra = "none" },
+	{ id = "void", name = "VOID", power = 2_000_000, multiplier = 1.4, color = rgb(245, 40, 170), accent = rgb(255, 160, 235), second = rgb(120, 40, 215), followTier = false, flames = 1.2, orbit = "slash", rings = 3, spin = 1, ground = "both", shards = true, extra = "none" },
 }
 
 -- Força do efeito da aura no boneco: nasce fraca e cresce com o Poder, até ficar inteira.
@@ -465,14 +553,12 @@ Config.AuraFx = {
 	startPower = 1_000, -- Poder em que a aura tem a força mínima
 	fullPower = 2_500_000, -- Poder em que ela chega à força total (a última parede)
 	minStrength = 0.22, -- força com startPower (0 = nada, 1 = inteira)
-	-- arcos girando
-	radius = 3.0, -- raio do primeiro anel, em studs (cada anel seguinte é um pouco maior)
-	spin = 5.5, -- giro, em radianos por segundo (x o spin de cada aura)
+	spin = 3.2, -- giro do que orbita, em radianos por segundo (x o spin da aura e o do estilo)
 	boostSpin = 1.4, -- quanto a carga acelera o giro
-	arcLength = 1.5, -- comprimento de cada arco, em radianos (1,57 = um quarto de volta)
-	arcWidth = 1.0, -- largura do arco no ponto mais gordo, em studs
-	haloSpin = 9, -- giro do ponto que desenha o anel fino de fora
-	flameRate = 38, -- labaredas subindo por segundo, com a aura inteira (a carga soma mais)
+	flameRate = 13, -- labaredas da frente por segundo, com a aura inteira e flames = 1
+	circleSize = 11, -- diâmetro do círculo do chão com a aura inteira, em studs
+	circleSpin = 16, -- giro do círculo, em graus por segundo
+	windPeriod = 1.3, -- segundos que cada onda de vento leva para abrir e sumir
 }
 
 Config.AuraById = {}
@@ -520,9 +606,29 @@ Config.CharacterById = {}
 for _, info in Config.Characters do
 	Config.CharacterById[info.id] = info
 end
+-- Versão de cada mundo seguinte (sorteada nas pistas dele): mesmo personagem, feito de rocha e
+-- lava, com a renda multiplicada. Não entra no INDEX.
+local LAVA, ASH = rgb(255, 110, 20), rgb(48, 30, 34)
+local everyone = table.clone(Config.Characters)
+for _, world in Config.Worlds do
+	if world.suffix ~= "" then
+		for _, info in Config.Characters do
+			local variant = table.clone(info)
+			variant.id = info.id .. world.suffix
+			variant.name = world.prefix .. info.name
+			variant.income = info.income * world.incomeMultiplier
+			variant.body = info.body:Lerp(ASH, 0.7)
+			variant.pants = info.pants:Lerp(ASH, 0.5):Lerp(LAVA, 0.25)
+			variant.glove = LAVA
+			variant.world = world.id
+			Config.CharacterById[variant.id] = variant
+			table.insert(everyone, variant)
+		end
+	end
+end
 -- Versão Shiny de cada personagem (só por fusão): não entra no sorteio nem no INDEX.
 local GOLD = rgb(255, 205, 60)
-for _, info in Config.Characters do
+for _, info in everyone do
 	local shiny = table.clone(info)
 	shiny.id = info.id .. Config.Fusion.suffix
 	shiny.name = "Shiny " .. info.name

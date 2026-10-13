@@ -12,6 +12,7 @@ local CharacterModels = require(ReplicatedStorage.Shared.CharacterModels)
 local Config = require(ReplicatedStorage.Shared.Config)
 local Format = require(ReplicatedStorage.Shared.Format)
 local Aura = require(script.Parent.Aura)
+local Worlds = require(script.Parent.Worlds)
 local Auto = require(script.Parent.Auto)
 local Fx = require(script.Parent.Fx)
 local Hud = require(script.Parent.Hud)
@@ -881,7 +882,15 @@ local function testHook()
 		return
 	end
 	remote.OnClientInvoke = function(command: string, arg: any): any
-		if command == "toggle" then
+		if command == "wizardTalk" then
+			Worlds.talk()
+			return Worlds.debug()
+		elseif command == "wizardAccept" then
+			Worlds.accept()
+			return true
+		elseif command == "worldState" then
+			return Worlds.debug()
+		elseif command == "toggle" then
 			Windows.toggle(arg)
 		elseif command == "panel" then
 			return Windows.debug()

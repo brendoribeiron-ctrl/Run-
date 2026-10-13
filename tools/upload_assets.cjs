@@ -1,10 +1,14 @@
-// Envia os .fbx de uma pasta ao Roblox pelo Open Cloud (Assets API v1) e grava os ids num
-// arquivo Luau. Lê ROBLOX_API_KEY, ROBLOX_CREATOR_ID e ROBLOX_CREATOR_TYPE do .env da raiz.
+// Envia os .fbx (modelos) e .png (texturas) de uma pasta ao Roblox pelo Open Cloud (Assets API
+// v1) e grava os ids num arquivo Luau. Lê ROBLOX_API_KEY, ROBLOX_CREATOR_ID e ROBLOX_CREATOR_TYPE do .env da raiz.
 //
 //   node tools/upload_assets.cjs --dry          lista o que seria enviado, sem falar com a Roblox
 //   node tools/upload_assets.cjs                envia os novos e os alterados
 //   node tools/upload_assets.cjs --force        envia todos de novo
 //   node tools/upload_assets.cjs <pasta> --out <arquivo.luau>   outra pasta e outro arquivo de ids
+//   node tools/upload_assets.cjs assets/textures --out src/shared/Textures.luau   as texturas
+//
+// Os .png sobem como asset do tipo Image: o id serve direto de Texture/Image no jogo. (Com
+// --type Decal o id devolvido é o do Decal, que não serve de textura.)
 //
 // Arquivo já enviado e sem mudança é pulado; arquivo alterado vira versão nova do mesmo asset
 // (o id não muda). O controle fica em <pasta>/uploaded.json.
@@ -36,11 +40,12 @@ function readEnv() {
 }
 
 function parseArgs(argv) {
-	const args = { folder: path.join(ROOT, "assets", "models"), out: path.join(ROOT, "src", "shared", "Assets.luau"), dry: false, force: false };
+	const args = { folder: path.join(ROOT, "assets", "models"), out: path.join(ROOT, "src", "shared", "Assets.luau"), dry: false, force: false, type: "Image" };
 	for (let i = 0; i < argv.length; i++) {
 		if (argv[i] === "--dry") args.dry = true;
 		else if (argv[i] === "--force") args.force = true;
 		else if (argv[i] === "--out") args.out = path.resolve(argv[++i]);
+		else if (argv[i] === "--type") args.type = argv[++i];
 		else args.folder = path.resolve(argv[i]);
 	}
 	return args;
@@ -81,21 +86,23 @@ async function waitOperation(operation, key) {
 	throw new Error("a operação não terminou em 2 minutos; rode de novo mais tarde");
 }
 
+const isImage = (file) => file.toLowerCase().endsWith(".png");
+
 function form(request, file) {
 	const body = new FormData();
 	body.append("request", JSON.stringify(request));
-	body.append("fileContent", new Blob([fs.readFileSync(file)], { type: "model/fbx" }), path.basename(file));
+	body.append("fileContent", new Blob([fs.readFileSync(file)], { type: isImage(file) ? "image/png" : "model/fbx" }), path.basename(file));
 	return body;
 }
 
-async function upload(file, name, previousId, env) {
+async function upload(file, name, previousId, env, imageType) {
 	if (previousId) {
 		// asset que já existe: versão nova, mesmo id
 		const operation = await call("PATCH", `${API}/assets/${previousId}`, env.ROBLOX_API_KEY, form({ assetId: previousId }, file));
 		return waitOperation(operation, env.ROBLOX_API_KEY);
 	}
 	const creator = env.ROBLOX_CREATOR_TYPE === "group" ? { groupId: env.ROBLOX_CREATOR_ID } : { userId: env.ROBLOX_CREATOR_ID };
-	const request = { assetType: "Model", displayName: name, description: "Enviado por tools/upload_assets.cjs", creationContext: { creator } };
+	const request = { assetType: isImage(file) ? imageType : "Model", displayName: name, description: "Enviado por tools/upload_assets.cjs", creationContext: { creator } };
 	const operation = await call("POST", `${API}/assets`, env.ROBLOX_API_KEY, form(request, file));
 	return waitOperation(operation, env.ROBLOX_API_KEY);
 }
@@ -120,8 +127,8 @@ async function main() {
 
 	const manifestFile = path.join(args.folder, "uploaded.json");
 	const manifest = fs.existsSync(manifestFile) ? JSON.parse(fs.readFileSync(manifestFile, "utf8")) : {};
-	const files = fs.readdirSync(args.folder).filter((file) => file.toLowerCase().endsWith(".fbx")).sort();
-	if (files.length === 0) return console.log("nenhum .fbx em " + args.folder);
+	const files = fs.readdirSync(args.folder).filter((file) => /.(fbx|png)$/i.test(file)).sort();
+	if (files.length === 0) return console.log("nenhum .fbx ou .png em " + args.folder);
 
 	const jobs = files.map((file) => {
 		const name = path.basename(file, path.extname(file)).replace(/[^A-Za-z0-9_]/g, "_");
@@ -144,7 +151,7 @@ async function main() {
 			continue;
 		}
 		try {
-			const assetId = await upload(job.file, job.name, job.known?.assetId, env);
+			const assetId = await upload(job.file, job.name, job.known?.assetId, env, args.type);
 			manifest[job.name] = { assetId, hash: job.hash };
 			// grava a cada arquivo: se o próximo falhar, o que já subiu não é enviado de novo
 			fs.writeFileSync(manifestFile, JSON.stringify(manifest, null, "\t") + "\n");

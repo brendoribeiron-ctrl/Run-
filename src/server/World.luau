@@ -280,6 +280,56 @@ function World.buildBounds(): Folder
 	return bounds
 end
 
+-- Paredes quebráveis de uma pista: grade de tijolos ancorados + placa com os requisitos. Cria
+-- a pasta "Walls" em `parent`. zone = centro da zona de carga dessa pista (as distâncias das
+-- paredes contam a partir dele, em -Z). materials = um material por tier, se não for o padrão.
+function World.buildWalls(parent: Instance, list: { any }, zone: Vector3, materials: { Enum.Material }?): Folder
+	local run = Config.Run
+	local width = run.hallwayWidth
+	local white = Color3.fromRGB(255, 255, 255)
+	local walls = Instance.new("Folder")
+	walls.Name = "Walls"
+	walls.Parent = parent
+	local byTier = materials or { Enum.Material.WoodPlanks, Enum.Material.SmoothPlastic, Enum.Material.Ice, Enum.Material.SmoothPlastic, Enum.Material.Metal, Enum.Material.Neon }
+	local columns, rows = 8, 4
+	local brickW, brickH = width / columns, 4
+	for index, info in list do
+		local wall = Instance.new("Model")
+		wall.Name = "Wall" .. index
+		wall:SetAttribute("Index", index)
+		local z = zone.Z - info.distance / run.metersPerStud
+		local color = Config.Rarities[info.tier].color
+		local bricks = Instance.new("Folder")
+		bricks.Name = "Bricks"
+		bricks.Parent = wall
+		for cx = 0, columns - 1 do
+			for cy = 0, rows - 1 do
+				local shade = if (cx + cy) % 2 == 0 then color else color:Lerp(Color3.new(0, 0, 0), 0.25)
+				local brick = part(bricks, {
+					name = "Brick",
+					size = Vector3.new(brickW, brickH, 2),
+					cframe = CFrame.new(zone.X - width / 2 + (cx + 0.5) * brickW, G + (cy + 0.5) * brickH, z),
+					color = shade,
+					material = byTier[info.tier],
+				})
+				brick.CastShadow = false
+			end
+		end
+		local sign = part(wall, { name = "Sign", size = Vector3.new(26, 8, 0.6), cframe = CFrame.new(zone.X, G + rows * brickH + 6, z), color = P.navy, collide = false })
+		local gui = Instance.new("SurfaceGui")
+		gui.Face = Enum.NormalId.Back
+		gui.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
+		gui.PixelsPerStud = 30
+		gui.LightInfluence = 0
+		label(gui, "Tier", string.upper(Config.Rarities[info.tier].id) .. " WALL", color, UDim2.fromScale(0.94, 0.36), UDim2.fromScale(0.03, 0.03))
+		label(gui, "Require", `Require {Format.abbreviate(info.power)} Power`, white, UDim2.fromScale(0.94, 0.3), UDim2.fromScale(0.03, 0.38))
+		label(gui, "Luck", `x{info.luck} Luck - {info.distance} M`, P.money, UDim2.fromScale(0.94, 0.26), UDim2.fromScale(0.03, 0.7))
+		gui.Parent = sign
+		wall.Parent = walls
+	end
+	return walls
+end
+
 -- Zona de carga, portão e o corredor com as paredes pré-fraturadas.
 function World.buildHallway(): Folder
 	local run = Config.Run
@@ -423,47 +473,7 @@ function World.buildHallway(): Folder
 		})
 	end
 
-	-- paredes: grade de tijolos ancorados + placa com os requisitos
-	local walls = Instance.new("Folder")
-	walls.Name = "Walls"
-	walls.Parent = hallway
-	local materials = { Enum.Material.WoodPlanks, Enum.Material.SmoothPlastic, Enum.Material.Ice, Enum.Material.SmoothPlastic, Enum.Material.Metal, Enum.Material.Neon }
-	local columns, rows = 8, 4
-	local brickW, brickH = width / columns, 4
-	for index, info in Config.Walls do
-		local wall = Instance.new("Model")
-		wall.Name = "Wall" .. index
-		wall:SetAttribute("Index", index)
-		local z = startZ - info.distance / run.metersPerStud
-		local color = Config.Rarities[info.tier].color
-		local bricks = Instance.new("Folder")
-		bricks.Name = "Bricks"
-		bricks.Parent = wall
-		for cx = 0, columns - 1 do
-			for cy = 0, rows - 1 do
-				local shade = if (cx + cy) % 2 == 0 then color else color:Lerp(Color3.new(0, 0, 0), 0.25)
-				local brick = part(bricks, {
-					name = "Brick",
-					size = Vector3.new(brickW, brickH, 2),
-					cframe = CFrame.new(-width / 2 + (cx + 0.5) * brickW, G + (cy + 0.5) * brickH, z),
-					color = shade,
-					material = materials[info.tier],
-				})
-				brick.CastShadow = false
-			end
-		end
-		local sign = part(wall, { name = "Sign", size = Vector3.new(26, 8, 0.6), cframe = CFrame.new(0, G + rows * brickH + 6, z), color = P.navy, collide = false })
-		local gui = Instance.new("SurfaceGui")
-		gui.Face = Enum.NormalId.Back
-		gui.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
-		gui.PixelsPerStud = 30
-		gui.LightInfluence = 0
-		label(gui, "Tier", string.upper(Config.Rarities[info.tier].id) .. " WALL", color, UDim2.fromScale(0.94, 0.36), UDim2.fromScale(0.03, 0.03))
-		label(gui, "Require", `Require {Format.abbreviate(info.power)} Power`, white, UDim2.fromScale(0.94, 0.3), UDim2.fromScale(0.03, 0.38))
-		label(gui, "Luck", `x{info.luck} Luck - {info.distance} M`, P.money, UDim2.fromScale(0.94, 0.26), UDim2.fromScale(0.03, 0.7))
-		gui.Parent = sign
-		wall.Parent = walls
-	end
+	World.buildWalls(hallway, Config.Walls, run.zoneCenter)
 
 	hallway.Parent = workspace
 	return hallway

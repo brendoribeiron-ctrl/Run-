@@ -14,6 +14,7 @@ local Pose = require(script.Pose)
 local Run = require(script.Run)
 local Stats = require(script.Stats)
 local Super = require(script.Super)
+local Worlds = require(script.Worlds)
 
 -- a ordem define a prioridade das poses: movimento < montaria < soco < carga e lançamento
 Hud.start()
@@ -29,3 +30,4 @@ Others.start()
 Stats.start()
 Auto.start()
 Menus.start()
+Worlds.start()

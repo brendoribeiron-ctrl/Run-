@@ -1,0 +1,38 @@
+{
+	"glow": {
+		"assetId": "79755305238513",
+		"hash": "8afb1a61b5c2dfa181d52a91d40d71a60b5ab25d"
+	},
+	"circle": {
+		"assetId": "84364560595212",
+		"hash": "536f9d1ef16d7c623f766dd75509f7900bb49a39"
+	},
+	"flame": {
+		"assetId": "73004643767862",
+		"hash": "26a1f4a27efb359c1a04ab898b7e1e3b81da3bb8"
+	},
+	"ribbon": {
+		"assetId": "81148903023774",
+		"hash": "02641f67edd0b1f58034b5a75d8e91585ffc5eac"
+	},
+	"shards": {
+		"assetId": "117191388954195",
+		"hash": "ae592905c2903d7dc49a16c9362a78bd84952d41"
+	},
+	"slash": {
+		"assetId": "109360615707590",
+		"hash": "1b48f17fe9a9e721d9cbe6b09dcf0fe0cd9ed5ef"
+	},
+	"star": {
+		"assetId": "77895675168056",
+		"hash": "a3abc036886bd6af3fd5c57c6f1513ce1b64019f"
+	},
+	"streak": {
+		"assetId": "74756202960301",
+		"hash": "0ce93c97ed2d1bad2faa9641cc6ad08fb73eae5a"
+	},
+	"swirl": {
+		"assetId": "92937482577644",
+		"hash": "6a710c40d8ac28b715afd1c83a3116bc71fe1ddd"
+	}
+}

@@ -56,21 +56,27 @@ hook:Invoke("set", player, { power = Config.AuraFx.fullPower })
 task.wait(0.3)
 local strong = ui("auraState")
 check("a aura cresce com o Poder", strong.strength > 0.99 and strong.rate > weak.rate * 2, `{weak.rate} -> {strong.rate}`)
-check("a aura exala energia", strong.flames and strong.pool and strong.hands == 2 and strong.flameRate > weak.flameRate * 2, `labaredas {weak.flameRate} -> {strong.flameRate}, mãos {strong.hands}`)
-check("a primeira aura tem um anel de arcos", weak.arcs == 2 and strong.arcs == 2 and not strong.halo, `{weak.arcs} / {strong.arcs}`)
--- cada aura tem o próprio desenho: mais anéis, anel de fora e o efeito extra dela
+check("a aura exala energia", strong.flames and strong.hands == 2 and strong.flameRate > weak.flameRate * 2, `labaredas {weak.flameRate} -> {strong.flameRate}, mãos {strong.hands}`)
+check("a primeira aura tem um anel de fitas e nada no chão", weak.arcs == 2 and strong.arcs == 2 and not strong.circle and not strong.swirl, `{weak.arcs} / {strong.arcs}`)
+-- cada aura tem o próprio desenho: a órbita, o chão, as lascas e o efeito extra dela
 local seen = {}
 for _, info in Config.Auras do
 	hook:Invoke("set", player, { aura = info.id })
 	task.wait(0.25)
 	local look = ui("auraState")
 	assert(look.arcs == info.rings * 2, `{info.id}: {look.arcs} arcos, esperava {info.rings * 2}`)
-	assert(look.halo == info.halo, `{info.id}: anel de fora {tostring(look.halo)}`)
-	local extra = if info.extra == "lightning" or info.extra == "none" then "none" else info.extra
+	assert(look.orbit == info.orbit, `{info.id}: órbita {tostring(look.orbit)}, esperava {info.orbit}`)
+	assert(look.circle == (info.ground == "circle" or info.ground == "both"), `{info.id}: círculo {tostring(look.circle)}`)
+	assert(look.swirl == (info.ground == "swirl" or info.ground == "both"), `{info.id}: vento {tostring(look.swirl)}`)
+	assert(look.shards == info.shards, `{info.id}: lascas {tostring(look.shards)}`)
+	assert(look.pillars == (if info.extra == "pillars" then 3 else 0), `{info.id}: {look.pillars} pilares`)
+	local extra = if info.extra == "pillars" then "none" else info.extra
 	assert(look.extra == extra, `{info.id}: extra {tostring(look.extra)}, esperava {extra}`)
 	seen[info.extra] = true
+	seen[info.orbit] = true
+	seen[info.ground] = true
 end
-check("cada aura tem o desenho dela", seen.snow and seen.bubbles and seen.lightning and seen.rays and seen.void, "extras")
+check("cada aura tem o desenho dela", seen.snow and seen.bubbles and seen.pillars and seen.ribbon and seen.slash and seen.thin and seen.circle and seen.swirl and seen.both, "desenhos")
 hook:Invoke("set", player, { aura = "void", power = Config.AuraFx.startPower })
 task.wait(0.25)
 check("aura forte com pouco Poder mostra menos arcos", ui("auraState").arcs < Config.AuraById.void.rings * 2 and ui("auraState").arcs >= 2, tostring(ui("auraState").arcs))

@@ -70,5 +70,25 @@
 	"potion_shop": {
 		"assetId": "111159887348002",
 		"hash": "e45a13b12c1de4e0241ad9a78d44f1a164b2daae"
+	},
+	"volcano_base": {
+		"assetId": "124467863613565",
+		"hash": "baa9ca5ffe92084ed4d0742b577d90d9e5993988"
+	},
+	"volcano_mount": {
+		"assetId": "132530076087945",
+		"hash": "b1f5c4c020cb01eac44b4f6e2de87786418f3fbc"
+	},
+	"volcano_spire": {
+		"assetId": "98126233394367",
+		"hash": "1206e092b3c661129afabcf4e6a3d4a09b2f2a43"
+	},
+	"volcano_track": {
+		"assetId": "77192793748371",
+		"hash": "d0e94937450f46c88694f4b89ed43f4f913d7203"
+	},
+	"wizard": {
+		"assetId": "75831952071316",
+		"hash": "8cdcc894578c5577f184d6798a6076306e1c4353"
 	}
 }

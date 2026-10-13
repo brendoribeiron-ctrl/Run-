@@ -366,8 +366,8 @@ function Scenery.build(): number
 	folder.Name = "Scenery"
 	local loaded = 0
 	for name, asset in Assets do
-		if name == "sanctum" or name == "potion_shop" or Config.MountById[name] then
-			continue -- a casa do centro é de Sanctum.luau e as montarias, de Mounts.luau
+		if Config.StructureAssets[name] or Config.MountById[name] then
+			continue -- casa, feiticeiro, vulcão e montarias têm o próprio módulo
 		end
 		local template = loadTemplate(name, asset)
 		if template then

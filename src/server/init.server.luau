@@ -19,16 +19,19 @@ local Mounts = require(script.Mounts)
 local Sanctum = require(script.Sanctum)
 local Scenery = require(script.Scenery)
 local State = require(script.State)
+local Volcano = require(script.Volcano)
+local Wizard = require(script.Wizard)
 local World = require(script.World)
 
 -- BagHit: C->S pedido de soco, S->C poder ganho (e tier novo, se subiu)
 -- Charge: C->S "start" | "release" | "cancel"      RunResult: S->C resultado da corrida (ou nil)
 -- Select: C->S índice do inventário                Fx: S->C efeitos ("reveal", "collected", "placed", "toast")
+-- World: C->S id do mundo para onde viajar (feiticeiro da casa, portal de volta)
 -- Stat: C->S nome do atributo a comprar          GoZone: C->S pedido de teleporte à zona de carga
 -- Super: S->C "start", senha, teclas | "result", acertou, ganho | "auto", ganho      C->S senha, acertou
 -- Auto: C->S "buy", nome | "toggle", nome, ligado
 -- Aura: C->S id da aura a equipar          Slot: C->S posição na mochila, slot rápido de destino
-State.createRemotes({ "BagHit", "Charge", "RunResult", "Select", "Fx", "Stat", "GoZone", "Super", "Auto", "Aura", "Slot", "Mount", "Cast", "Sell", "Rebirth", "Potion", "Daily", "Playtime", "Quest", "Fuse" })
+State.createRemotes({ "BagHit", "Charge", "RunResult", "Select", "Fx", "Stat", "GoZone", "Super", "Auto", "Aura", "Slot", "Mount", "Cast", "Sell", "Rebirth", "Potion", "Daily", "Playtime", "Quest", "Fuse", "World" })
 local remotes = State.remotes
 
 World.setupLighting()
@@ -36,7 +39,12 @@ World.buildLobby()
 Hall.build(World.buildHallway())
 World.buildBounds()
 -- os modelos vêm da Roblox (uma chamada por modelo): monta em paralelo, sem segurar o servidor
-task.spawn(Sanctum.build)
+task.spawn(function()
+	if Sanctum.build() then
+		Wizard.build()
+	end
+end)
+task.spawn(Volcano.build)
 task.spawn(Mounts.build)
 task.spawn(Scenery.build)
 
@@ -139,6 +147,7 @@ local function headTag(player: Player, character: Model)
 end
 
 local function placeCharacter(player: Player, character: Model)
+	player:SetAttribute("World", 1) -- todo boneco novo nasce no terreno, no mundo 1
 	task.spawn(headTag, player, character)
 	local plot = State.plot(player)
 	if not plot then
@@ -736,10 +745,49 @@ local function goZone(player: Player): boolean
 		return false
 	end
 	lastTeleport[player] = now
-	character:PivotTo(CFrame.new(Config.Run.zoneCenter + Config.Run.teleportOffset))
+	character:PivotTo(CFrame.new(Config.zoneCenter(State.world(player)) + Config.Run.teleportOffset))
 	return true
 end
 remotes.GoZone.OnServerEvent:Connect(goZone)
+
+-- Viagem entre mundos. Para os mundos seguintes o jogador precisa ter os rebirths que o
+-- feiticeiro pede e estar perto dele; para voltar ao mundo 1, basta estar fora de uma corrida.
+-- O destino é sempre decidido aqui.
+local function travel(player: Player, id: any): boolean
+	local world = if type(id) == "number" then Config.Worlds[id] else nil
+	local profile = PlayerData.get(player)
+	local character = player.Character
+	local root = State.root(player)
+	if not world or not profile or not character or not root or Run.isBusy(player) or State.world(player).id == world.id then
+		return false
+	end
+	if world.id ~= 1 then
+		if profile.rebirths < world.rebirths then
+			remotes.Fx:FireClient(player, "toast", `You need {world.rebirths} rebirths to enter the {world.name}!`)
+			return false
+		end
+		local wizard = Wizard.position()
+		if not wizard or (root.Position - wizard).Magnitude > Config.Wizard.travelRange then
+			return false
+		end
+	end
+	player:SetAttribute("World", world.id)
+	local target = State.homeCFrame(player)
+	if not target then
+		player:SetAttribute("World", 1)
+		return false
+	end
+	-- o mapa é carregado por proximidade: pede o destino antes, senão o boneco chega sem chão
+	pcall(function()
+		player:RequestStreamAroundAsync(target.Position, 5)
+	end)
+	if character.Parent then
+		root.AssemblyLinearVelocity = Vector3.zero
+		character:PivotTo(target)
+	end
+	return true
+end
+remotes.World.OnServerEvent:Connect(travel)
 
 -- Rede de segurança: quem cair para fora do mapa volta para o próprio terreno.
 task.spawn(function()
@@ -747,11 +795,11 @@ task.spawn(function()
 		task.wait(1)
 		for _, player in Players:GetPlayers() do
 			local root = State.root(player)
-			local plot = State.plot(player)
+			local home = State.homeCFrame(player)
 			local character = player.Character
-			if root and plot and character and root.Position.Y < Config.World.fallY then
+			if root and home and character and root.Position.Y < Config.World.fallY then
 				root.AssemblyLinearVelocity = Vector3.zero
-				character:PivotTo(State.spawnCFrame(plot))
+				character:PivotTo(home)
 			end
 		end
 	end
@@ -854,6 +902,7 @@ local function resetPlayer(player: Player): boolean
 		Pedestals.attach(player, State.plots[id])
 		local character = player.Character
 		if character and character.Parent then
+			player:SetAttribute("World", 1)
 			character:PivotTo(State.spawnCFrame(State.plots[id]))
 		end
 	end
@@ -943,6 +992,10 @@ if RunService:IsStudio() then
 			return true
 		elseif command == "roll" then
 			return Run.rollCharacter(value)
+		elseif command == "travel" then
+			return travel(player, value)
+		elseif command == "wizard" then
+			return Wizard.position()
 		elseif command == "pedestal" then
 			return Pedestals.interact(player, value)
 		elseif command == "mount" then

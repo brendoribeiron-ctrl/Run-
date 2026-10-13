@@ -10,9 +10,10 @@ function RunMath.effectivePower(power: number, charge: number): number
 	return math.floor(power * (0.4 + 0.6 * math.clamp(charge, 0, 1)))
 end
 
-function RunMath.wallsBroken(effective: number): number
+-- walls = as paredes do mundo em que a corrida acontece (sem isso, as do mundo 1).
+function RunMath.wallsBroken(effective: number, walls: any?): number
 	local count = 0
-	for _, wall in Config.Walls do
+	for _, wall in walls or Config.Walls do
 		if effective < wall.power then
 			break
 		end
@@ -22,8 +23,8 @@ function RunMath.wallsBroken(effective: number): number
 end
 
 -- Distância em studs até onde a corrida termina.
-function RunMath.stopStuds(broken: number): number
-	local walls = Config.Walls
+function RunMath.stopStuds(broken: number, list: any?): number
+	local walls = list or Config.Walls
 	local run = Config.Run
 	if broken < #walls then
 		return walls[broken + 1].distance / run.metersPerStud
@@ -31,8 +32,8 @@ function RunMath.stopStuds(broken: number): number
 	return walls[#walls].distance / run.metersPerStud + run.endPadding * 0.6
 end
 
-function RunMath.wallStuds(index: number): number
-	return Config.Walls[index].distance / Config.Run.metersPerStud
+function RunMath.wallStuds(index: number, walls: any?): number
+	return (walls or Config.Walls)[index].distance / Config.Run.metersPerStud
 end
 
 -- Tier (índice de raridade) do Poder atual: o da parede mais forte que ele quebra com carga cheia.

@@ -15,3 +15,6 @@ sourcemap.json
 
 # Chave do Open Cloud (nunca vai para o Git)
 .env
+
+# Cache do Python dos scripts do Blender
+__pycache__/

@@ -1,6 +1,6 @@
--- Mostra cada aura por 4 segundos, com o Poder cheio, para captura (a última fica carregando).
+-- Mostra cada aura por 5 segundos, com o Poder cheio, para captura; a última repete carregando.
 --   node tools/bridge.cjs run server src/server/tests/view_auras.luau 90000
---   powershell -File tools\screenshot.ps1 -Out shots\aura.png -Count 8 -IntervalMs 4000 -DelayMs 2500
+--   powershell -File tools\screenshot.ps1 -Out shots\aura.png -Count 16 -IntervalMs 2500 -DelayMs 1500
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Config = require(ReplicatedStorage.Shared.Config)
@@ -11,10 +11,12 @@ local at = Vector3.new(70, Config.World.groundY + 4, 30)
 character:PivotTo(CFrame.new(at))
 task.wait(0.5)
 local spot = character:GetPivot().Position
-for index, info in Config.Auras do
-	hook:Invoke("set", player, { aura = info.id, power = if index == 1 then Config.AuraFx.startPower else Config.AuraFx.fullPower })
-	hook:Invoke("ui", player, { command = "camera", arg = { from = spot + Vector3.new(0, 3, 15), to = spot + Vector3.new(0, 0.5, 0), seconds = 4 } })
-	task.wait(4)
+local seconds = 5
+hook:Invoke("ui", player, { command = "camera", arg = { from = spot + Vector3.new(0, 4.5, 17), to = spot + Vector3.new(0, 1, 0), seconds = seconds * (#Config.Auras + 1) } })
+for _, info in Config.Auras do
+	hook:Invoke("set", player, { aura = info.id, power = Config.AuraFx.fullPower })
+	task.wait(seconds)
 end
--- a mesma primeira aura, fraca, de perto, para comparar
+hook:Invoke("ui", player, { command = "charge", arg = seconds - 1 })
+task.wait(seconds)
 return #Config.Auras .. " auras"

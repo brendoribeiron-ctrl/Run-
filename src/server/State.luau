@@ -47,4 +47,26 @@ function State.spawnCFrame(plot: Model): CFrame
 	return CFrame.lookAt(position, Vector3.new(bag.X, position.Y, bag.Z))
 end
 
+-- Mundo em que o jogador está (atributo "World").
+function State.world(player: Player): any
+	return Config.worldOf(player)
+end
+
+-- Onde o jogador aparece no mundo 2: no meio da ilha, olhando para o portão da pista.
+function State.arriveCFrame(world: any): CFrame
+	local at = world.offset + Config.Volcano.arrive + Vector3.new(0, Config.World.groundY, 0)
+	return CFrame.lookAt(at, at + Vector3.new(0, 0, -1))
+end
+
+-- Para onde o jogador volta depois da corrida ou de cair: o terreno dele no mundo 1, a ilha de
+-- chegada nos outros.
+function State.homeCFrame(player: Player): CFrame?
+	local world = Config.worldOf(player)
+	if world.id ~= 1 then
+		return State.arriveCFrame(world)
+	end
+	local plot = State.plot(player)
+	return if plot then State.spawnCFrame(plot) else nil
+end
+
 return State

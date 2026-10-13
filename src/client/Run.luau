@@ -81,9 +81,15 @@ local function character(): (Model?, BasePart?, Humanoid?)
 	return nil, nil, nil
 end
 
+-- Mundo em que o jogador está: decide a zona de carga, a pista e as paredes.
+local function world(): any
+	return Config.worldOf(player)
+end
+
 local function inZone(root: BasePart): boolean
-	return math.abs(root.Position.X - RUN.zoneCenter.X) <= RUN.zoneSize.X / 2
-		and math.abs(root.Position.Z - RUN.zoneCenter.Z) <= RUN.zoneSize.Y / 2
+	local zone = Config.zoneCenter(world())
+	return math.abs(root.Position.X - zone.X) <= RUN.zoneSize.X / 2
+		and math.abs(root.Position.Z - zone.Z) <= RUN.zoneSize.Y / 2
 end
 
 local function tierColor(tier: number): Color3
@@ -292,7 +298,7 @@ local function stepLines(dt: number)
 end
 
 local function setNeon(color: Color3)
-	local hallway = workspace:FindFirstChild("Hallway")
+	local hallway = workspace:FindFirstChild(world().hallway)
 	local neon = hallway and hallway:FindFirstChild("Neon")
 	if neon then
 		for _, strip in neon:GetChildren() do
@@ -304,7 +310,7 @@ local function setNeon(color: Color3)
 end
 
 local function wallModel(index: number): Model?
-	local hallway = workspace:FindFirstChild("Hallway")
+	local hallway = workspace:FindFirstChild(world().hallway)
 	local walls = hallway and hallway:FindFirstChild("Walls")
 	local wall = walls and walls:FindFirstChild("Wall" .. index)
 	return if wall and wall:IsA("Model") then wall else nil
@@ -328,7 +334,8 @@ end
 -- Estoura a parede: some com os tijolos de verdade (só neste cliente) e joga cópias na câmera.
 local function breakWall(index: number)
 	local wall = wallModel(index)
-	local info = Config.Walls[index]
+	local walls = world().walls
+	local info = walls[index]
 	local color = tierColor(info.tier)
 	if wall then
 		local bricks = wall:FindFirstChild("Bricks")
@@ -352,7 +359,7 @@ local function breakWall(index: number)
 		end
 		local sign = wall:FindFirstChild("Sign")
 		if sign and sign:IsA("BasePart") then
-			Fx.burst(Vector3.new(0, 6, sign.Position.Z), color:Lerp(Ui.white, 0.5), 46, 0.28)
+			Fx.burst(Vector3.new(sign.Position.X, 6, sign.Position.Z), color:Lerp(Ui.white, 0.5), 46, 0.28)
 		end
 	end
 	Fx.flash(color, 0.45, 0.16)
@@ -361,7 +368,7 @@ local function breakWall(index: number)
 	smashRight = not smashRight
 	fovKick = 14
 	linesPulse = 1
-	linesPower = index / #Config.Walls
+	linesPower = index / #walls
 	showPopup(Format.abbreviate(info.power) .. "!", color)
 	lineColor = color:Lerp(Ui.white, 0.35)
 	setNeon(color)
@@ -459,8 +466,9 @@ local function stepCharge(now: number, dt: number)
 	end
 	local pct = math.clamp((now - chargeStart) / RUN.chargeTime, 0, 1)
 	local power = player:GetAttribute("Power")
-	local broken = RunMath.wallsBroken(RunMath.effectivePower(if type(power) == "number" then power else 0, pct))
-	local tier = if broken > 0 then Config.Walls[broken].tier else 0
+	local walls = world().walls
+	local broken = RunMath.wallsBroken(RunMath.effectivePower(if type(power) == "number" then power else 0, pct), walls)
+	local tier = if broken > 0 then walls[broken].tier else 0
 	local color = tierColor(tier)
 
 	chargeFill.Size = UDim2.new(pct, -8 * pct, 1, -8)
@@ -598,13 +606,15 @@ local function playRun(result: any)
 	Fx.ring(root.Position - Vector3.new(0, 2.7, 0), Ui.white, 70, 0.5)
 	Fx.cubes(root.Position - Vector3.new(0, 2, 0), Color3.fromRGB(122, 80, 40), 14, 30, Vector3.new(0, 20, 40), 1.4)
 
-	local walls = Config.Walls
+	local place = world()
+	local walls = place.walls
 	local broken: number = result.broken
 	local runTime: number = result.runTime
-	local startZ = RUN.zoneCenter.Z
+	local zone = Config.zoneCenter(place)
+	local startZ = zone.Z
 	local start = root.Position
 	local totalStuds = walls[#walls].distance / RUN.metersPerStud
-	local stopZ = startZ - RunMath.stopStuds(broken)
+	local stopZ = startZ - RunMath.stopStuds(broken, walls)
 	if broken < #walls then
 		stopZ += 5 -- para na frente da parede, não dentro dela
 	end
@@ -631,7 +641,7 @@ local function playRun(result: any)
 		-- costura a pista de um lado para o outro, deitando o corpo na curva
 		local weave = math.sin(t * 2.6) * 3.2 * blend
 		local roll = -math.cos(t * 2.6) * 0.2 * blend
-		local position = Vector3.new(start.X * (1 - blend) + weave, start.Y, start.Z + (z - start.Z) * blend)
+		local position = Vector3.new(zone.X + (start.X - zone.X) * (1 - blend) + weave, start.Y, start.Z + (z - start.Z) * blend)
 		root.CFrame = CFrame.new(position) * CFrame.Angles(math.rad(-12), 0, roll)
 
 		-- ciclo de corrida rápido; ao estourar uma parede, um braço soca para a frente por 0,3 s
@@ -651,7 +661,7 @@ local function playRun(result: any)
 		end
 		marker.Position = UDim2.fromScale(math.clamp((startZ - z) / totalStuds, 0, 1), 0.5)
 
-		while nextWall <= broken and RUN.speed * t >= RunMath.wallStuds(nextWall) do
+		while nextWall <= broken and RUN.speed * t >= RunMath.wallStuds(nextWall, walls) do
 			breakWall(nextWall)
 			nextWall += 1
 		end
