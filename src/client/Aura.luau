@@ -7,6 +7,9 @@
 --   chão    círculo mágico girando (dois, um contra o outro) e/ou vento em espiral abrindo
 --   soltos  lascas voando para fora, estrelas piscando, riscos de luz subindo, pilares de luz
 --           descendo do céu, raios, neve, bolhas
+--   voo     a aura inteira escorre para o lado contrário ao movimento: parado ela sobe; andando
+--           inclina; correndo deita para trás e ganha um rastro de cometa que chicoteia nas
+--           curvas; pulando escorre para baixo e caindo, para cima
 --
 -- As texturas são próprias (src/shared/Textures.luau, desenhadas por
 -- tools/blender/aura_textures.py): brancas, a cor entra aqui.
@@ -71,6 +74,13 @@ local Aura = {}
 type Blade = { top: Attachment, bottom: Attachment, trail: Trail, ring: number, phase: number }
 type Ground = { part: Part, gui: SurfaceGui, pool: ImageLabel, outer: ImageLabel, inner: ImageLabel, winds: { ImageLabel } }
 type Pillar = { beam: Beam, low: Attachment, high: Attachment, phase: number, period: number, at: Vector3 }
+-- Rastro de cometa: três faixas (sombra, cor, miolo) da frente do corpo até a ponta do rastro.
+type Comet = { head: Attachment, tail: Attachment, beams: { Beam } }
+local COMET = {
+	{ name = "Shade", width = 6.6, depth = -1.2, speed = 0.7, emission = 0, veil = 0.25 },
+	{ name = "Body", width = 5.2, depth = -0.6, speed = 1, emission = 0.3, veil = 0.12 },
+	{ name = "Core", width = 2.9, depth = 0, speed = 1.5, emission = 0.5, veil = 0.05 },
+}
 type State = {
 	player: Player,
 	rig: Part?, -- peça ancorada no centro do boneco: os pontos das órbitas giram dentro dela
@@ -79,6 +89,17 @@ type State = {
 	ground: Ground?,
 	groundY: number,
 	pillars: { Pillar },
+	comet: Comet?,
+	nozzle: Part?, -- peça solta de onde as labaredas saem: fica na ponta de onde a aura escorre
+	lastPos: Vector3?,
+	velocity: Vector3, -- velocidade do boneco, alisada
+	flow: Vector3, -- para onde a aura escorre agora
+	tailFlow: Vector3, -- o mesmo, mais atrasado: a ponta do rastro
+	motion: number, -- 0 = parado (aura em pé), 1 = deitada de vez
+	swept: number, -- motion e velocidade com que as labaredas foram ajustadas da última vez
+	sweptSpeed: number,
+	clear: number, -- 1 = rastro inteiro; cai quando ele aponta para a câmera (só no jogador local)
+	sweptClear: number,
 	rays: RaycastParams?,
 	front: ParticleEmitter?, -- labaredas da frente (cor da aura)
 	back: ParticleEmitter?, -- labaredas de trás (segunda cor)
@@ -109,7 +130,7 @@ local rng = Random.new()
 local function stateOf(player: Player): State
 	local state = states[player]
 	if not state then
-		state = { player = player, blades = {}, pillars = {}, trails = {}, hands = {}, groundY = 0, forcedTrails = false, boost = 0, sprint = 0, angle = 0, wind = 0, nextArc = 0, hidden = false } :: State
+		state = { player = player, blades = {}, pillars = {}, trails = {}, hands = {}, velocity = Vector3.zero, flow = Vector3.yAxis, tailFlow = Vector3.yAxis, motion = 0, swept = 0, sweptSpeed = 0, clear = 1, sweptClear = 1, groundY = 0, forcedTrails = false, boost = 0, sprint = 0, angle = 0, wind = 0, nextArc = 0, hidden = false } :: State
 		states[player] = state
 	end
 	return state
@@ -195,6 +216,86 @@ local function setupExtra(e: ParticleEmitter, kind: string)
 end
 
 local EXTRA_RATE: { [string]: number } = { snow = 22, bubbles = 18 }
+-- giro da labareda quando ela segue a própria velocidade (a ponta da chama aponta para o rastro)
+local FLIGHT_TURN = 90
+
+local function smoothstep(a: number, b: number, x: number): number
+	local t = math.clamp((x - a) / (b - a), 0, 1)
+	return t * t * (3 - 2 * t)
+end
+
+-- O que nas labaredas depende do movimento. Parada, cada labareda vive o tempo dela e sobe.
+-- Em movimento ela fica para trás no mundo, então: vive só o bastante para cobrir o rastro,
+-- nasce mais vezes para o rastro não virar uma fila de carimbos e deita no sentido do voo.
+local function sweep(state: State)
+	local player = state.player
+	local info = infoOf(player)
+	local k = strengthOf(player)
+	local boost, w, speed = state.boost, state.motion, state.velocity.Magnitude
+	local clear = state.clear
+	state.swept, state.sweptSpeed, state.sweptClear = w, speed, clear
+	local many = 0.25 + 0.75 * k
+	local big = 0.5 + 0.5 * k
+	local heat: number = if info then info.flames else 0
+	local flying = w > 0.12
+	local tail = FX.flightTail * big * (0.45 + 0.55 * w) * (0.3 + 0.7 * clear)
+	local life = if flying then math.clamp(tail / math.max(speed, 1) / 0.8, 0.12, 1) else 1
+	local base = FX.flameRate * heat * many * (1 + boost * 1.6)
+	local rate = if flying and heat > 0 then math.max(base, speed / FX.flightGap * math.min(heat, 1)) else base
+	local size = (2.6 + 1.2 * math.min(heat, 1.2)) * big * (1 + boost * 0.45) * (1 + 0.15 * w)
+	local rise = NumberRange.new((3 + boost * 4) * (1 - 0.5 * w), (6 + boost * 7) * (1 - 0.5 * w))
+	local facing = if flying then Enum.ParticleOrientation.VelocityParallel else Enum.ParticleOrientation.FacingCamera
+	local turn = if flying then NumberRange.new(FLIGHT_TURN - 6, FLIGHT_TURN + 6) else NumberRange.new(-16, 16)
+	local spin = if flying then NumberRange.new(0) else NumberRange.new(-14, 14)
+	for index, e in { state.front :: any, state.back, state.shade } do
+		if e then
+			local grow = if index == 1 then 1 elseif index == 2 then 1.3 else 1.6
+			e.Rate = rate * (if index == 1 then 1 elseif index == 2 then 0.7 else 0.55)
+			-- com o rastro vindo para a câmera, as camadas de trás não crescem (tapariam a tela)
+			grow = 1 + (grow - 1) * clear
+			e.Size = seq({ { 0, size * 0.85 * grow }, { 1, size * 1.1 * grow } })
+			e.Speed = rise
+			e.Lifetime = NumberRange.new(0.6 * life, 0.95 * life)
+			e.Orientation = facing
+			e.Rotation = turn
+			e.RotSpeed = spin
+			e.SpreadAngle = if flying then Vector2.new(5, 5) else Vector2.new(14, 14)
+		end
+	end
+	local licks = state.licks
+	if licks then
+		licks.Rate = base * 0.6 * (1 - 0.85 * w)
+		licks.Size = seq({ { 0, size * 0.45 }, { 1, size * 0.6 } })
+		licks.Lifetime = NumberRange.new(0.45 * life, 0.75 * life)
+	end
+	for _, hand in state.hands do
+		hand.Lifetime = NumberRange.new(0.3 * life, 0.5 * life)
+	end
+	local streaks = state.streaks
+	if streaks then
+		streaks.Rate = (7 + boost * 40) * many * (1 + 2 * w)
+		streaks.Orientation = facing
+		streaks.Rotation = if flying then NumberRange.new(0) else NumberRange.new(90)
+		streaks.Lifetime = NumberRange.new(0.35 * math.max(life, 0.5), 0.7 * math.max(life, 0.5))
+	end
+
+	-- rastro de cometa: aparece conforme a aura deita
+	local comet = state.comet
+	if comet then
+		local shown = if k > 0 and not state.hidden and heat > 0 then smoothstep(0.15, 0.55, w) else 0
+		for index, beam in comet.beams do
+			local layer = COMET[index]
+			beam.Enabled = shown > 0.02
+			if shown > 0.02 then
+				local clear = 1 - (1 - layer.veil) * shown * (0.55 + 0.45 * k)
+				beam.Transparency = seq({ { 0, 1 }, { 0.07, clear }, { 0.6, clear + (1 - clear) * 0.25 }, { 1, 1 } })
+				beam.Width0 = layer.width * big * (1 + boost * 0.3) * (0.45 + 0.55 * clear)
+				beam.Width1 = layer.width * big * 0.22 * clear
+				beam.TextureSpeed = FX.flightScroll * layer.speed * (0.6 + 0.4 * w)
+			end
+		end
+	end
+end
 
 local function apply(state: State)
 	local player = state.player
@@ -238,36 +339,22 @@ local function apply(state: State)
 		end
 	end
 
-	-- fogo toon
-	local rate = FX.flameRate * heat * many * (1 + boost * 1.6)
-	local size = (2.6 + 1.2 * math.min(heat, 1.2)) * big * (1 + boost * 0.45)
-	local rise = NumberRange.new(3 + boost * 4, 6 + boost * 7)
+	-- fogo toon: aqui a cor e o que está ligado; quantidade, tamanho e direção ficam em sweep
 	local front, back, shade, licks = state.front, state.back, state.shade, state.licks
 	if front then
 		front.Color = ColorSequence.new({ ColorSequenceKeypoint.new(0, accent), ColorSequenceKeypoint.new(0.45, color), ColorSequenceKeypoint.new(1, color) })
-		front.Rate = rate
-		front.Size = seq({ { 0, size * 0.85 }, { 1, size * 1.1 } })
-		front.Speed = rise
 		front.Enabled = on
 	end
 	if back then
 		back.Color = ColorSequence.new(second:Lerp(accent, 0.25), second)
-		back.Rate = rate * 0.7
-		back.Size = seq({ { 0, size * 1.1 }, { 1, size * 1.4 } })
-		back.Speed = rise
 		back.Enabled = on
 	end
 	if shade then
 		shade.Color = ColorSequence.new(dark)
-		shade.Rate = rate * 0.55
-		shade.Size = seq({ { 0, size * 1.35 }, { 1, size * 1.75 } })
-		shade.Speed = rise
 		shade.Enabled = on and k > 0.3
 	end
 	if licks then
 		licks.Color = ColorSequence.new(accent, color)
-		licks.Rate = rate * 0.6
-		licks.Size = seq({ { 0, size * 0.45 }, { 1, size * 0.6 } })
 		licks.Enabled = on
 	end
 	for _, hand in state.hands do
@@ -276,6 +363,13 @@ local function apply(state: State)
 		hand.Size = seq({ { 0, 1.1 * big }, { 1, 1.5 * big } })
 		hand.Enabled = on and k > 0.3
 	end
+	local comet = state.comet
+	if comet then
+		comet.beams[1].Color = ColorSequence.new(dark)
+		comet.beams[2].Color = ColorSequence.new(color, second)
+		comet.beams[3].Color = ColorSequence.new(accent, color)
+	end
+	sweep(state)
 
 	local shards, stars, streaks, extra, light, outline = state.shards, state.stars, state.streaks, state.extra, state.light, state.outline
 	if shards then
@@ -291,7 +385,6 @@ local function apply(state: State)
 	end
 	if streaks then
 		streaks.Color = ColorSequence.new(accent, color)
-		streaks.Rate = (7 + boost * 40) * many
 		streaks.Enabled = on
 	end
 	if extra then
@@ -417,6 +510,12 @@ local function dropLoose(state: State)
 		state.ground.part:Destroy()
 		state.ground = nil
 	end
+	if state.nozzle then
+		state.nozzle:Destroy()
+		state.nozzle = nil
+	end
+	state.comet = nil
+	state.lastPos = nil
 	table.clear(state.blades)
 	table.clear(state.pillars)
 	state.orbit = nil
@@ -511,6 +610,7 @@ local function attach(state: State, character: Model)
 	if not root or not root:IsA("BasePart") or state.player.Character ~= character then
 		return
 	end
+	dropLoose(state)
 	state.root = root
 	state.groundY = root.Position.Y - 3
 	local rays = RaycastParams.new()
@@ -575,21 +675,12 @@ local function attach(state: State, character: Model)
 	state.extra = x
 	state.extraKind = nil
 
-	-- base nos pés: as labaredas nascem numa caixa baixa e sobem
-	local feet = Instance.new("Part")
-	feet.Name = "AuraFeet"
-	feet.Size = Vector3.new(3.8, 0.4, 3.2)
+	-- bocal: caixa baixa de onde as labaredas nascem. Não é soldada: animate a põe na ponta de
+	-- onde a aura escorre (nos pés, parado; na frente do corpo, voando), virada para o rastro
+	local feet = Fx.part(Vector3.new(3.8, 0.4, 3.2), root.CFrame * CFrame.new(0, -1.9, 0), BASE_COLOR)
+	feet.Name = "AuraNozzle"
 	feet.Transparency = 1
-	feet.CanCollide = false
-	feet.CanQuery = false
-	feet.CanTouch = false
-	feet.Massless = true
-	feet.CFrame = root.CFrame * CFrame.new(0, -1.9, 0)
-	local feetWeld = Instance.new("WeldConstraint")
-	feetWeld.Part0 = root
-	feetWeld.Part1 = feet
-	feetWeld.Parent = feet
-	feet.Parent = character
+	state.nozzle = feet
 	local shade = flame(feet, "Shade", -1.6)
 	shade.LightEmission = 0
 	shade.Brightness = 1
@@ -681,7 +772,6 @@ local function attach(state: State, character: Model)
 	end)
 
 	-- peça ancorada que acompanha o boneco sem girar com ele: as órbitas e os pilares vivem nela
-	dropLoose(state)
 	local rig = Fx.part(Vector3.one, CFrame.new(root.Position), BASE_COLOR)
 	rig.Name = "AuraRig"
 	rig.Transparency = 1
@@ -715,8 +805,69 @@ local function attach(state: State, character: Model)
 		beam.Parent = rig
 		table.insert(state.pillars, { beam = beam, low = low, high = high, phase = index / PILLARS, period = 1.1 + index * 0.23, at = Vector3.zero })
 	end
+	local head = Instance.new("Attachment")
+	head.Name = "CometHead"
+	head.Parent = rig
+	local tail = Instance.new("Attachment")
+	tail.Name = "CometTail"
+	tail.Parent = rig
+	local comet: Comet = { head = head, tail = tail, beams = {} }
+	for _, layer in COMET do
+		local beam = Instance.new("Beam")
+		beam.Name = "AuraComet" .. layer.name
+		beam.Attachment0 = head
+		beam.Attachment1 = tail
+		beam.Texture = Textures.comet
+		beam.TextureMode = Enum.TextureMode.Stretch
+		beam.TextureLength = 1
+		beam.FaceCamera = true
+		beam.LightEmission = layer.emission
+		beam.LightInfluence = 0
+		beam.Brightness = 1.5
+		beam.Segments = 14
+		beam.ZOffset = layer.depth
+		beam.Enabled = false
+		beam.Parent = rig
+		table.insert(comet.beams, beam)
+	end
+	state.comet = comet
 	state.ground = buildGround()
 	apply(state)
+end
+
+-- Acha para onde a aura escorre neste quadro: para cima parado, para o lado contrário ao
+-- movimento conforme a velocidade. A velocidade sai da posição (vale para qualquer jogador e
+-- para quando o boneco é levado por código, sem física).
+local function drift(state: State, root: BasePart, dt: number)
+	local position = root.Position
+	local step = position - (state.lastPos or position)
+	state.lastPos = position
+	-- um salto grande num quadro só é teleporte, não corrida
+	local velocity = if dt > 0 and step.Magnitude < 40 then step / dt else Vector3.zero
+	state.velocity = state.velocity:Lerp(velocity, 1 - math.exp(-dt * 12))
+	local speed = state.velocity.Magnitude
+	local w = math.clamp(speed / FX.flightSpeed, 0, 1) ^ 0.7
+	local goal = Vector3.yAxis
+	if speed > 1 then
+		local lean = Vector3.yAxis * (1 - w + FX.flightLift) - state.velocity.Unit * w
+		goal = if lean.Magnitude > 0.05 then lean.Unit else Vector3.yAxis
+	end
+	local flow = state.flow:Lerp(goal, 1 - math.exp(-dt * FX.flightFollow))
+	state.flow = if flow.Magnitude > 0.05 then flow.Unit else goal
+	local tailFlow = state.tailFlow:Lerp(state.flow, 1 - math.exp(-dt * FX.flightTailFollow))
+	state.tailFlow = if tailFlow.Magnitude > 0.05 then tailFlow.Unit else state.flow
+	state.motion = w
+end
+
+-- CFrame com o eixo Y em dir (o lado sai do lado do boneco, para não rodopiar).
+local function along(position: Vector3, dir: Vector3, root: BasePart): CFrame
+	local side = root.CFrame.RightVector
+	side -= dir * side:Dot(dir)
+	if side.Magnitude < 0.05 then
+		side = root.CFrame.LookVector
+		side -= dir * side:Dot(dir)
+	end
+	return CFrame.fromMatrix(position, side.Unit, dir)
 end
 
 -- Outros jogadores: a carga e a corrida saem do que o servidor replica.
@@ -743,16 +894,12 @@ local function follow(state: State, root: BasePart, dt: number)
 	end
 end
 
-local function smoothstep(a: number, b: number, x: number): number
-	local t = math.clamp((x - a) / (b - a), 0, 1)
-	return t * t * (3 - 2 * t)
-end
-
 local function animate(state: State, now: number, dt: number)
 	local rig, root = state.rig, state.root
 	if not rig or not root or not root.Parent then
 		return
 	end
+	drift(state, root, dt)
 	local k = strengthOf(state.player)
 	if state.hidden or k <= 0 then
 		return
@@ -760,8 +907,38 @@ local function animate(state: State, now: number, dt: number)
 	local info = infoOf(state.player)
 	local boost = state.boost
 	local origin = root.Position
-	rig.CFrame = CFrame.new(origin)
+	local flow, w = state.flow, state.motion
 	local size = (0.72 + 0.28 * k) * (1 + boost * 0.35)
+	-- os anéis deitam junto com a aura (menos que ela: continuam em volta do corpo)
+	local lean = Vector3.yAxis:Lerp(flow, 0.6)
+	rig.CFrame = along(origin, if lean.Magnitude > 0.05 then lean.Unit else Vector3.yAxis, root).Rotation + origin
+	local nozzle = state.nozzle
+	if nozzle then
+		nozzle.CFrame = along(origin - flow * 1.9, flow, root)
+	end
+	-- no jogador local, o rastro que aponta para a câmera encolhe: na corrida ela fica bem atrás
+	-- do boneco e o rastro inteiro passaria por dentro dela
+	if state == me then
+		local eye = workspace.CurrentCamera.CFrame.Position - origin
+		local facing = if eye.Magnitude > 0.5 then flow:Dot(eye.Unit) else 0
+		state.clear = 1 - smoothstep(0.45, 0.85, facing) * smoothstep(0.1, 0.4, w)
+	end
+	if math.abs(w - state.swept) > 0.04 or math.abs(state.clear - state.sweptClear) > 0.08 or math.abs(state.velocity.Magnitude - state.sweptSpeed) > math.max(2, state.sweptSpeed * 0.12) then
+		sweep(state)
+	end
+	local comet = state.comet
+	if comet and comet.beams[1].Enabled then
+		local reach = FX.flightTail * (0.5 + 0.5 * k) * (0.45 + 0.55 * w) * (1 + boost * 0.3) * (0.3 + 0.7 * state.clear)
+		local from = origin - flow * 3.2
+		local to = origin + state.tailFlow * reach
+		-- a faixa sai no sentido do voo de agora e chega no da ponta atrasada: nas curvas ela dobra
+		comet.head.WorldCFrame = CFrame.fromMatrix(from, flow, along(from, flow, root).RightVector)
+		comet.tail.WorldCFrame = CFrame.fromMatrix(to, state.tailFlow, along(to, state.tailFlow, root).RightVector)
+		for _, beam in comet.beams do
+			beam.CurveSize0 = reach * 0.4
+			beam.CurveSize1 = reach * 0.4
+		end
+	end
 	local breath = math.sin(now * 2.2)
 
 	-- órbitas: o giro acelera na carga e pulsa (arranca e alivia) conforme o estilo
@@ -825,9 +1002,9 @@ local function animate(state: State, now: number, dt: number)
 				pillar.at = Vector3.new(math.cos(angle) * reach, 0, math.sin(angle) * reach)
 			end
 			local swell = math.sin(pillar.phase * math.pi) ^ 0.6 * (0.5 + 0.5 * k) * (1 + boost)
-			local foot = Vector3.new(pillar.at.X, state.groundY - origin.Y, pillar.at.Z)
-			pillar.low.Position = foot
-			pillar.high.Position = foot + Vector3.new(0, 60, 0)
+			local foot = Vector3.new(origin.X + pillar.at.X, state.groundY, origin.Z + pillar.at.Z)
+			pillar.low.WorldPosition = foot
+			pillar.high.WorldPosition = foot + Vector3.new(0, 60, 0)
 			pillar.beam.Width0 = swell * 1.5
 			pillar.beam.Width1 = swell * 0.4
 		end
@@ -895,6 +1072,11 @@ function Aura.debug(): { [string]: any }
 		swirl = ground ~= nil and ground.gui.Enabled and ground.winds[1].Visible,
 		shards = me.shards ~= nil and me.shards.Enabled,
 		pillars = pillars,
+		flight = me.motion,
+		clear = me.clear,
+		flow = me.flow,
+		comet = me.comet ~= nil and me.comet.beams[1].Enabled,
+		flameLife = if me.front then me.front.Lifetime.Max else 0,
 		extra = if me.extra and me.extra.Enabled then me.extraKind else "none",
 	}
 end

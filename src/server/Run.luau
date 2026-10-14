@@ -119,7 +119,7 @@ local function grant(player: Player, characterId: string)
 	end)
 end
 
--- Fim da corrida: entrega a recompensa e devolve o jogador ao terreno.
+-- Fim da corrida: entrega a recompensa e devolve o jogador à zona de carga, pronto para outra.
 function Run.finish(player: Player)
 	local session = sessions[player]
 	if not session then
@@ -131,10 +131,14 @@ function Run.finish(player: Player)
 	if session.reward then
 		grant(player, session.reward)
 	end
-	local home = State.homeCFrame(player)
 	local character = player.Character
-	if home and character and character.Parent then
-		character:PivotTo(home)
+	if character and character.Parent then
+		local root = character:FindFirstChild("HumanoidRootPart")
+		if root and root:IsA("BasePart") then
+			root.AssemblyLinearVelocity = Vector3.zero
+			root.AssemblyAngularVelocity = Vector3.zero
+		end
+		character:PivotTo(State.zoneCFrame(player))
 	end
 end
 

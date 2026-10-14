@@ -51,7 +51,7 @@ check("soco bloqueado durante a corrida", hook:Invoke("hit", player) == nil, "em
 hook:Invoke("runFinish", player)
 task.wait(0.3)
 check("recompensa entra no inventário", #state().inventory == 1 and state().inventory[1] == weak.characterId, tostring(#state().inventory))
-check("volta para o terreno", (root.Position - home.Position).Magnitude < 25, tostring(root.Position))
+check("volta para a zona de carga", (root.Position - (Config.Run.zoneCenter + Config.Run.teleportOffset)).Magnitude < 8, tostring(root.Position))
 check("índice marca o personagem", state().index[weak.characterId] == true, weak.characterId)
 
 -- Poder logo abaixo da 3ª parede: quebra as duas primeiras e para nela

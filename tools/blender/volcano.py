@@ -2,6 +2,9 @@
 #
 #   volcano_base   a ilha de chegada: praça de basalto com o cristal de magma no centro, obeliscos,
 #                  o portal de volta, poças de lava, a muralha de colunas e o portão da pista
+#   volcano_terrace  o terraço dos terrenos, atrás da ilha: laje larga com a passagem que sai dos
+#                  dois lados do portal, moldura de obsidiana em volta de cada um dos seis
+#                  terrenos, obeliscos e chifres entre eles, caminho de lajes na frente
 #   volcano_track  um trecho de 50 studs da pista (o jogo repete): lajes sobre lava, canais de
 #                  lava nas bordas, paredões de colunas de basalto com cachoeira de lava e, no
 #                  começo do trecho, um par de chifres de obsidiana com braseiros pendurados
@@ -189,6 +192,8 @@ def build_base():
             x, yy = math.cos(a) * radius, math.sin(a) * radius
             if yy > 0 and abs(x) < 23:
                 continue
+            if yy < 0 and abs(x) < 46:
+                continue  # atrás do portal a ilha se abre para o terraço dos terrenos
             column(b, rnd, x, yy, 2.05, -4, rnd.uniform(low, high))
 
     # portão: duas torres de colunas, cada uma com lava escorrendo, e dois chifres cruzados em cima
@@ -241,7 +246,7 @@ def build_base():
     # espinhos de obsidiana perto da muralha
     for n in range(16):
         a = n * 2 * math.pi / 16 + 0.2
-        if abs(math.cos(a) * 74) < 26 and math.sin(a) > 0:
+        if (abs(math.cos(a) * 74) < 26 and math.sin(a) > 0) or (abs(math.cos(a) * 74) < 50 and math.sin(a) < 0):
             continue
         for _ in range(3):
             rr = 74 + rnd.uniform(-3, 3)
@@ -256,6 +261,109 @@ def build_base():
         kit.snapshot(os.path.join(SNAP, "base_b.png"), (10, 20, 9), (0, 90, 30), 22)
         kit.snapshot(os.path.join(SNAP, "base_c.png"), (18, -20, 8), (0, -62, 9), 30)
     return b
+
+
+# ============================================================================== terraço dos terrenos
+# Origem no centro da fileira de terrenos. Os terrenos são os do mundo 1 (60 x 70, um a cada 72),
+# virados para +Y, que é o lado da ilha.
+def build_terrace():
+    t = kit.Kit("volcano_terrace")
+    rnd = random.Random(17)
+    HALF_X, HALF_Y = 240.0, 60.0
+    NECK = 46.0  # meia largura da passagem para a ilha
+    NECK_END = 96.0
+    PLOTS = [(i - 2.5) * 72.0 for i in range(6)]
+    PLOT_X, PLOT_Y = 30.0, 35.0
+
+    # a laje: um retângulo de cantos cortados, e a língua que encosta na ilha
+    c = 16.0
+    outline = [(-HALF_X + c, -HALF_Y), (HALF_X - c, -HALF_Y), (HALF_X, -HALF_Y + c), (HALF_X, HALF_Y - c), (HALF_X - c, HALF_Y), (-HALF_X + c, HALF_Y), (-HALF_X, HALF_Y - c), (-HALF_X, -HALF_Y + c)]
+    t.slab("Rock", outline, -18, -0.12)
+    t.slab("Rock", [(-NECK, HALF_Y - 2), (NECK, HALF_Y - 2), (NECK - 6, NECK_END), (-NECK + 6, NECK_END)], -18, -0.12)
+    skirt = [(x * 1.035, y * 1.1) for x, y in outline]
+    t.slab("RockDark", skirt, -22, -6)
+
+    # caminho de lajes na frente dos terrenos, com um fio de lava de cada lado
+    x = -HALF_X + 12
+    while x < HALF_X - 12:
+        step = min(rnd.uniform(9, 14), HALF_X - 12 - x)
+        t.box("Basalt" if rnd.random() < 0.5 else "BasaltDark", (step - 0.4, 11.4, 0.5), (x + step / 2, PLOT_Y + 9, -0.25 - rnd.uniform(0, 0.03)))
+        x += step
+    for dy in (-6.3, 6.3):
+        t.box("Lava", (HALF_X * 2 - 26, 0.7, 0.4), (0, PLOT_Y + 9 + dy, -0.24))
+    # e as lajes da passagem até a ilha
+    y = PLOT_Y + 15.5
+    while y < NECK_END - 1:
+        step = min(rnd.uniform(7, 10), NECK_END - 1 - y)
+        cut = rnd.uniform(-8, 8)
+        for x0, x1 in ((-30, cut - 0.2), (cut + 0.2, 30)):
+            t.box("Basalt" if rnd.random() < 0.5 else "BasaltDark", (x1 - x0, step - 0.4, 0.5), ((x0 + x1) / 2, y + step / 2, -0.25 - rnd.uniform(0, 0.03)))
+        y += step
+
+    # moldura de cada terreno: meio-fio de obsidiana dos lados e atrás, marco aceso nos cantos
+    for px in PLOTS:
+        for sx in (-1, 1):
+            t.box("Obsidian", (1.0, PLOT_Y * 2 + 1.0, 1.5), (px + sx * (PLOT_X + 0.5), 0, 0.3))
+            t.box("Ember", (0.35, PLOT_Y * 2 - 4, 0.2), (px + sx * (PLOT_X + 0.5), 0, 1.1))
+            for sy in (-1, 1):
+                cx, cy = px + sx * (PLOT_X + 0.5), sy * (PLOT_Y + 0.5)
+                t.loft("Obsidian", [(cx, cy, -0.5, 1.5), (cx, cy, 0.8, 1.5), (cx, cy, 1.1, 1.1), (cx, cy, 5.2, 0.75), (cx, cy, 6.6, 0)], 4, phase=math.pi / 4)
+                t.gem("Ember", cx, cy, 7.9, 0.5, 1.5, 4)
+        t.box("Obsidian", (PLOT_X * 2 + 2.0, 1.0, 1.5), (px, -PLOT_Y - 0.5, 0.3))
+        t.box("Ember", (PLOT_X * 2 - 4, 0.35, 0.2), (px, -PLOT_Y - 0.5, 1.1))
+
+    # entre um terreno e outro: veio de lava no chão, obelisco no fundo e um chifre curvando por cima
+    gaps = [(i - 3) * 72.0 for i in range(7)]
+    for n, gx in enumerate(gaps):
+        t.box("Lava", (1.0, PLOT_Y * 2 - 8, 0.4), (gx, -2, -0.25))
+        t.loft("Obsidian", [(gx, -44, -0.5, 2.6), (gx, -44, 1.2, 2.6), (gx, -44, 1.5, 2.1), (gx, -44, 17, 1.4), (gx, -44, 21, 0)], 4, phase=math.pi / 4)
+        t.loft("Ember", [(gx, -44, 7.0, 1.95), (gx, -44, 7.5, 1.9)], 4, phase=math.pi / 4)
+        t.loft("Ember", [(gx, -44, 12.5, 1.7), (gx, -44, 12.9, 1.66)], 4, phase=math.pi / 4)
+        t.gem("Ember", gx, -44, 23.2, 0.65, 1.9, 4)
+        if n % 2 == 0:
+            pts = [(gx, -57, -1.5), (gx, -60, 12), (gx, -56, 26), (gx, -44, 37), (gx, -29, 41), (gx, -17, 40)]
+            t.tube("Obsidian", pts, [2.8, 2.5, 2.1, 1.6, 0.9, 0], 7)
+            band(t, "Ember", pts[1], pts[2], 0.4, 2.55)
+            band(t, "Ember", pts[2], pts[3], 0.6, 2.0)
+            t.box("Iron", (0.22, 0.22, 9.5), (gx, -34, 35.0))
+            brazier(t, gx, -34, 28.6)
+        else:
+            t.cyl("Rock", 1.5, -1, 4.2, gx, 26, 6, phase=HEX)
+            brazier(t, gx, 26, 4.2)
+
+    # muralha: alta atrás e dos lados, baixa na frente (para a ilha aparecer), aberta na passagem
+    def wall(x0, y0, x1, y1, low, high, rows):
+        length = math.hypot(x1 - x0, y1 - y0)
+        count = max(int(length / 3.55), 1)
+        nx, ny = (y1 - y0) / length, -(x1 - x0) / length  # para fora
+        for row in range(rows):
+            for k in range(count):
+                at = (k + 0.5 + 0.5 * (row % 2)) / count
+                x, y = x0 + (x1 - x0) * at + nx * row * 3.2, y0 + (y1 - y0) * at + ny * row * 3.2
+                column(t, rnd, x, y, 2.05, -5, rnd.uniform(low, high) + row * 7)
+
+    inset = 3.0
+    corners = [(x * (1 - inset / HALF_X), y * (1 - inset / HALF_Y)) for x, y in outline]
+    wall(*corners[1], *corners[0], 14, 30, 3)  # fundo
+    wall(*corners[2], *corners[1], 12, 24, 2)
+    wall(*corners[0], *corners[7], 12, 24, 2)
+    wall(*corners[3], *corners[2], 10, 22, 2)  # lado direito
+    wall(*corners[7], *corners[6], 10, 22, 2)  # lado esquerdo
+    wall(*corners[4], *corners[3], 6, 14, 2)
+    wall(*corners[6], *corners[5], 6, 14, 2)
+    wall(corners[4][0], corners[4][1], NECK + 2, corners[4][1], 2.5, 7, 1)  # frente, à direita da passagem
+    wall(-NECK - 2, corners[5][1], corners[5][0], corners[5][1], 2.5, 7, 1)  # frente, à esquerda
+    for sx in (-1, 1):
+        wall(sx * (NECK - 1), HALF_Y - 1, sx * (NECK - 7), NECK_END, 4, 11, 1) if sx > 0 else wall(sx * (NECK - 7), NECK_END, sx * (NECK - 1), HALF_Y - 1, 4, 11, 1)
+        t.cyl("Rock", 1.8, -1, 5.0, sx * (NECK - 9), HALF_Y + 2, 6, phase=HEX)
+        brazier(t, sx * (NECK - 9), HALF_Y + 2, 5.0, 1.2)
+
+    t.build(COLORS, GLOW)
+    t.export(MODELS)
+    if SNAP:
+        kit.snapshot(os.path.join(SNAP, "terrace_a.png"), (-150, 260, 190), (0, 0, 0), 28)
+        kit.snapshot(os.path.join(SNAP, "terrace_b.png"), (-70, 62, 16), (-20, -30, 10), 24)
+    return t
 
 
 # ============================================================================== vulcão do fundo
@@ -332,7 +440,7 @@ def build_spire():
 
 
 kits = []
-for build in (build_track, build_base, build_mount, build_spire):
+for build in (build_track, build_base, build_terrace, build_mount, build_spire):
     for done in kits:
         done.hide(True)
     kits.append(build())

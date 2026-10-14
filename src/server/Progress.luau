@@ -53,9 +53,10 @@ end
 ---------------------------------------------------------------------------------------------------
 -- Rebirth
 
--- Poder exigido para o próximo rebirth: a última parede, e mais a cada rebirth já feito.
+-- Poder exigido para o próximo rebirth: a última parede do mundo em que o jogador está na
+-- progressão (ver Config.rebirthCost).
 function Progress.rebirthCost(rebirths: number): number
-	return math.floor(Config.Walls[#Config.Walls].power * Config.Rebirth.costGrowth ^ rebirths)
+	return Config.rebirthCost(rebirths)
 end
 
 -- Zera Poder, dinheiro (o do bolso e o guardado nos pedestais) e o saco, em troca de mais um

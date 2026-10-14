@@ -1,5 +1,6 @@
 --!strict
--- Mundo 2, o vulcão: ilha de chegada, pista, mar de lava, vulcões e agulhas de rocha no fundo.
+-- Mundo 2, o vulcão: ilha de chegada, terraço dos terrenos, pista, mar de lava, vulcões e
+-- agulhas de rocha no fundo.
 -- Os modelos vêm do Blender (tools/blender/volcano.py); aqui eles são pintados e postos no
 -- lugar, e ganham colisão, luzes, a zona de carga, as paredes quebráveis e o portal de volta.
 --
@@ -23,6 +24,19 @@ local WORLD = Config.Worlds[2]
 local O = WORLD.offset
 
 local Volcano = {}
+
+-- Os terrenos do vulcão são os mesmos do gramado (World.buildPlot), de rocha e lava.
+local PLOT_THEME: World.PlotTheme = {
+	floor = Color3.fromRGB(58, 44, 50),
+	floorMaterial = Enum.Material.Basalt,
+	carpet = Color3.fromRGB(170, 48, 24),
+	slab = Color3.fromRGB(84, 68, 76),
+	neon = Color3.fromRGB(255, 150, 30),
+	frame = Color3.fromRGB(30, 18, 44),
+	band = Color3.fromRGB(255, 196, 60),
+	pad = Color3.fromRGB(96, 80, 88),
+	step = Color3.fromRGB(70, 54, 60),
+}
 
 local function rgb(r: number, g: number, b: number): Color3
 	return Color3.fromRGB(r, g, b)
@@ -141,6 +155,9 @@ local function buildIsland(folder: Instance, colliders: Instance)
 		if at.Z < center.Z and math.abs(at.X - center.X) < 26 then
 			continue
 		end
+		if at.Z > center.Z and math.abs(at.X - center.X) < V.neck + 6 then
+			continue -- atrás, a ilha se abre para o terraço dos terrenos (o portal fica no meio)
+		end
 		part(colliders, { name = "Rim", size = Vector3.new(width, 120, 4), cframe = CFrame.new(center) * turn * CFrame.new(0, 60, -radius), visible = false })
 	end
 	-- torres do portão, obeliscos, pedestal do cristal e o portal
@@ -186,6 +203,45 @@ local function buildIsland(folder: Instance, colliders: Instance)
 	for _, side in { -1, 1 } do
 		light(folder, onIsland(side * 19.5, 77.5, 6), EMBER, 36, 2)
 		light(folder, onIsland(side * 40, 0, 12), LAVA, 60, 1.2)
+	end
+end
+
+-- Terraço dos terrenos, atrás da ilha: o modelo (laje, molduras, obeliscos, muralha) e a colisão.
+-- Os terrenos em si já existem desde o começo (Volcano.buildPlots).
+local function buildTerrace(folder: Instance, colliders: Instance)
+	local center = O + Vector3.new(0, G, Config.World.plotRowZ)
+	local model = Models.load("volcano_terrace", STYLE)
+	if model then
+		model:PivotTo(CFrame.new(center))
+		model.Parent = folder
+	end
+	local sx, sz = V.terraceSize.X, V.terraceSize.Y
+	local front = center.Z - sz / 2 -- a borda virada para a ilha
+	local island = O + V.islandCenter
+	-- onde a passagem encosta na muralha da ilha
+	local reach = math.sqrt((V.islandRadius - 4.5) ^ 2 - (V.neck + 6) ^ 2)
+	local neckStart = island.Z + reach - 6
+	part(colliders, { name = "TerraceFloor", size = Vector3.new(sx, 4, sz), cframe = CFrame.new(center.X, G - 2, center.Z), visible = false })
+	part(colliders, { name = "NeckFloor", size = Vector3.new(V.neck * 2, 4, front - neckStart + 2), cframe = CFrame.new(center.X, G - 2, (front + neckStart) / 2), visible = false })
+	-- paredes invisíveis: fundo, lados, frente (menos a passagem) e os dois lados da passagem
+	part(colliders, { name = "TerraceWall", size = Vector3.new(sx + 8, 120, 4), cframe = CFrame.new(center.X, G + 60, center.Z + sz / 2 - 4), visible = false })
+	local side = (sx / 2 - V.neck) + 4
+	for _, s in { -1, 1 } do
+		part(colliders, { name = "TerraceWall", size = Vector3.new(4, 120, sz), cframe = CFrame.new(center.X + s * (sx / 2 - 4), G + 60, center.Z), visible = false })
+		part(colliders, { name = "TerraceWall", size = Vector3.new(side, 120, 4), cframe = CFrame.new(center.X + s * (V.neck + side / 2), G + 60, front + 2), visible = false })
+		part(colliders, { name = "NeckWall", size = Vector3.new(4, 120, front - neckStart + 6), cframe = CFrame.new(center.X + s * (V.neck + 2), G + 60, (front + neckStart) / 2), visible = false })
+		post(colliders, "Brazier", 2.2, G, G + 8, Vector3.new(center.X + s * (V.neck - 9), 0, center.Z - 62))
+	end
+	-- obeliscos no fundo de cada vão entre terrenos e braseiros na frente dos vãos ímpares
+	for n = 0, 6 do
+		local x = center.X + (n - 3) * Config.World.plotSpacing
+		post(colliders, "Obelisk", 2.4, G, G + 20, Vector3.new(x, 0, center.Z + 44))
+		if n % 2 == 1 then
+			post(colliders, "Brazier", 1.8, G, G + 7, Vector3.new(x, 0, center.Z - 26))
+			light(folder, Vector3.new(x, G + 9, center.Z - 26), EMBER, 44, 2)
+		else
+			light(folder, Vector3.new(x, G + 30, center.Z + 34), EMBER, 50, 2.2)
+		end
 	end
 end
 
@@ -292,7 +348,8 @@ local function buildBackdrop(folder: Instance, farZ: number)
 			local z = rng:NextNumber(farZ - 120, O.Z + 260)
 			local nearIsland = Vector2.new(x - island.X, z - island.Z).Magnitude < V.islandRadius + 55
 			local nearTrack = math.abs(x - O.X) < 78 and z < O.Z + V.gateZ + 40
-			if nearIsland or nearTrack then
+			local nearTerrace = math.abs(x - O.X) < V.terraceSize.X / 2 + 50 and math.abs(z - (O.Z + Config.World.plotRowZ)) < V.terraceSize.Y / 2 + 50
+			if nearIsland or nearTrack or nearTerrace then
 				continue
 			end
 			local copy = spire:Clone()
@@ -303,6 +360,27 @@ local function buildBackdrop(folder: Instance, farZ: number)
 		end
 		spire:Destroy()
 	end
+end
+
+-- Os terrenos do vulcão: um por terreno do gramado, no mesmo lugar somado ao offset. Monta na
+-- hora (sem esperar modelo nenhum), porque o servidor liga os pedestais e o saco logo em seguida.
+function Volcano.buildPlots(): { Model }
+	local folder = Instance.new("Folder")
+	folder.Name = WORLD.plots
+	local plots = {}
+	for i = 1, Config.World.plotCount do
+		local plot = World.buildPlot(i, World.plotCFrame(i) + O, PLOT_THEME)
+		plot:SetAttribute("World", WORLD.id)
+		-- só o terreno do gramado é ponto de nascimento
+		local spawn = plot:FindFirstChild("Spawn")
+		if spawn and spawn:IsA("SpawnLocation") then
+			spawn.Enabled = false
+		end
+		plot.Parent = folder
+		plots[i] = plot
+	end
+	folder.Parent = workspace
+	return plots
 end
 
 function Volcano.build()
@@ -317,6 +395,7 @@ function Volcano.build()
 
 	buildSea(folder)
 	buildIsland(folder, colliders)
+	buildTerrace(folder, colliders)
 	buildZone(hallway, zone)
 	local farZ = buildTrack(folder, colliders, hallway, zone)
 	buildBackdrop(folder, farZ)

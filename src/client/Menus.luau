@@ -21,6 +21,7 @@ local Others = require(script.Parent.Others)
 local Move = require(script.Parent.Move)
 local Pose = require(script.Parent.Pose)
 local Run = require(script.Parent.Run)
+local Stats = require(script.Parent.Stats)
 local Super = require(script.Parent.Super)
 local Ui = require(script.Parent.Ui)
 local Windows = require(script.Parent.Windows)
@@ -653,7 +654,7 @@ end
 local rebirthLabels: { count: TextLabel, now: TextLabel, need: TextLabel, button: TextButton }
 
 local function rebirthCost(rebirths: number): number
-	return math.floor(Config.Walls[#Config.Walls].power * Config.Rebirth.costGrowth ^ rebirths)
+	return Config.rebirthCost(rebirths)
 end
 
 local function refreshRebirth()
@@ -892,6 +893,9 @@ local function testHook()
 			return Worlds.debug()
 		elseif command == "toggle" then
 			Windows.toggle(arg)
+		elseif command == "skillsFocus" then
+			Stats.focus(arg)
+			return true
 		elseif command == "panel" then
 			return Windows.debug()
 		elseif command == "autoToggle" then
@@ -940,7 +944,8 @@ local function testHook()
 			Move.dash()
 			return true
 		elseif command == "camera" then
-			-- prende a câmera em arg.from olhando para arg.to por arg.seconds (para capturas do mapa)
+			-- prende a câmera em arg.from olhando para arg.to por arg.seconds (para capturas do mapa);
+			-- com arg.follow, os dois pontos são relativos ao boneco e a câmera vai junto com ele
 			local camera = workspace.CurrentCamera
 			local finish = os.clock() + arg.seconds
 			RunService:UnbindFromRenderStep("TestCamera")
@@ -950,7 +955,10 @@ local function testHook()
 					camera.CameraType = Enum.CameraType.Custom
 				else
 					camera.CameraType = Enum.CameraType.Scriptable
-					camera.CFrame = CFrame.lookAt(arg.from, arg.to)
+					local character = player.Character
+					local root = character and character:FindFirstChild("HumanoidRootPart")
+					local base = if arg.follow and root and root:IsA("BasePart") then root.Position else Vector3.zero
+					camera.CFrame = CFrame.lookAt(base + arg.from, base + arg.to)
 				end
 			end)
 			return true

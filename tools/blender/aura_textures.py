@@ -327,6 +327,33 @@ def streak():
     return save("streak", np.ones_like(alpha), alpha)
 
 
+def comet():
+    """Faixa de fogo para o rastro do voo: corre ao longo de X e emenda nas pontas (a textura
+    desliza pelo Beam). Corpo cheio no meio, borda em línguas deitadas, fios soltos por fora."""
+    w, h = 512, 256
+    X, Y = grid(w, h)
+
+    def tile(sx, sy, seed):
+        # ruído que emenda em X: mistura a amostra com a mesma amostra uma volta atrás
+        return fbm(X * sx, Y * sy, seed) * (1 - X) + fbm((X - 1) * sx, Y * sy, seed) * X
+
+    v = np.abs(Y - 0.5) * 2
+    tongues = tile(3.0, 5.0, 31)
+    # línguas: dente de serra que sobe devagar e cai de uma vez, deitado para trás; cada lado
+    # da faixa tem o seu passo, para não ficar espelhado
+    side = np.where(Y > 0.5, 0.0, 0.43)
+    saw = np.mod(X * 4 + side + v * 0.9 + 0.35 * (tongues - 0.5), 1.0)
+    saw2 = np.mod(X * 7 + side * 2 + v * 0.6, 1.0)
+    edge = 0.36 + 0.34 * np.power(saw, 1.6) + 0.14 * np.power(saw2, 2.0) + 0.3 * (tongues - 0.5)
+    body = v < edge
+    wisps = (tile(2.0, 16.0, 47) > 0.66) & (v < 0.94) & (v > 0.3)
+    alpha = np.maximum(body * 1.0, wisps * 0.8)
+    # por dentro, veios mais escuros correndo no sentido do voo: dois tons com a mesma cor
+    veins = tile(2.5, 22.0, 59)
+    tone = np.where(body & (veins > 0.6) & (v > 0.1), 0.7, 1.0)
+    return save("comet", tone, alpha)
+
+
 def preview(images):
     """Um plano por textura, lado a lado, com a imagem como luz própria sobre fundo escuro."""
     for obj in list(bpy.data.objects):
@@ -369,7 +396,7 @@ def preview(images):
 
 def main():
     os.makedirs(OUT, exist_ok=True)
-    images = [flame(), circle(), swirl(), ribbon(), slash(), shards(), star(), glow(), streak()]
+    images = [flame(), circle(), swirl(), ribbon(), slash(), shards(), star(), glow(), streak(), comet()]
     preview(images)
 
 

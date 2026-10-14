@@ -31,10 +31,10 @@ local zone = Config.zoneCenter(world)
 local ran = zone.Z - at.Z
 task.wait(Config.Run.returnDelay + 4)
 local inventory = hook:Invoke("state", player).inventory
-local home = (character:GetPivot().Position - (world.offset + Config.Volcano.arrive)).Magnitude
+local home = (character:GetPivot().Position - (zone + Config.Run.teleportOffset)).Magnitude
 assert(math.abs(at.X - zone.X) < 12 and ran > studs - 40, `o boneco não correu pela pista do vulcão: {at}`)
 assert(#inventory == 1 and string.sub(inventory[1], -#world.suffix) == world.suffix, "sem personagem de magma: " .. tostring(inventory[1]))
-assert(home < 14, "não voltou para a ilha: " .. tostring(character:GetPivot().Position))
+assert(home < 8, "não voltou para a zona de carga: " .. tostring(character:GetPivot().Position))
 hook:Invoke("travel", player, 1)
 hook:Invoke("reset", player)
-return `correu {math.floor(ran)} studs no vulcão, ganhou {inventory[1]}, voltou para a ilha`
+return `correu {math.floor(ran)} studs no vulcão, ganhou {inventory[1]}, voltou para a zona de carga`

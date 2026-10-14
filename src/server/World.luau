@@ -479,12 +479,16 @@ function World.buildHallway(): Folder
 	return hallway
 end
 
+-- Cores do terreno. O do mundo 1 usa a paleta do jogo; os outros mundos passam o próprio tema.
+export type PlotTheme = { floor: Color3, floorMaterial: Enum.Material, carpet: Color3, slab: Color3, neon: Color3, frame: Color3, band: Color3, pad: Color3, step: Color3 }
+local MEADOW: PlotTheme = { floor = P.sand, floorMaterial = Enum.Material.SmoothPlastic, carpet = P.red, slab = P.slab, neon = P.cyan, frame = P.navy, band = P.machineYellow, pad = P.slab, step = P.grassDark }
+
 function World.plotCFrame(index: number): CFrame
 	local x = (index - (W.plotCount + 1) / 2) * W.plotSpacing
 	return CFrame.new(x, G, W.plotRowZ)
 end
 
-local function buildGantry(plot: Model, origin: CFrame)
+local function buildGantry(plot: Model, origin: CFrame, T: PlotTheme)
 	local gantry = Instance.new("Model")
 	gantry.Name = "Gantry"
 
@@ -493,14 +497,14 @@ local function buildGantry(plot: Model, origin: CFrame)
 	-- Dois pilares ao longo de Z para o pórtico ficar de frente para o tapete.
 	for _, dz in { -5, 5 } do
 		local base = bagPos + Vector3.new(0, 0, dz)
-		part(gantry, { name = "Pillar", size = Vector3.new(2, 14, 2), cframe = CFrame.new(base + Vector3.new(0, 7, 0)), color = P.navy })
+		part(gantry, { name = "Pillar", size = Vector3.new(2, 14, 2), cframe = CFrame.new(base + Vector3.new(0, 7, 0)), color = T.frame })
 		for _, y in { 3, 10 } do
-			part(gantry, { name = "Band", size = Vector3.new(2.3, 0.9, 2.3), cframe = CFrame.new(base + Vector3.new(0, y, 0)), color = P.machineYellow })
+			part(gantry, { name = "Band", size = Vector3.new(2.3, 0.9, 2.3), cframe = CFrame.new(base + Vector3.new(0, y, 0)), color = T.band })
 		end
 	end
-	part(gantry, { name = "Beam", size = Vector3.new(2.4, 2, 14), cframe = CFrame.new(bagPos + Vector3.new(0, 15, 0)), color = P.navy })
+	part(gantry, { name = "Beam", size = Vector3.new(2.4, 2, 14), cframe = CFrame.new(bagPos + Vector3.new(0, 15, 0)), color = T.frame })
 
-	local sign = part(gantry, { name = "Sign", size = Vector3.new(0.6, 5, 11), cframe = CFrame.new(bagPos + Vector3.new(0, 19, 0)), color = P.navy })
+	local sign = part(gantry, { name = "Sign", size = Vector3.new(0.6, 5, 11), cframe = CFrame.new(bagPos + Vector3.new(0, 19, 0)), color = T.frame })
 	for _, face in { Enum.NormalId.Right, Enum.NormalId.Left } do
 		local gui = Instance.new("SurfaceGui")
 		gui.Name = "Gui" .. face.Name
@@ -514,7 +518,7 @@ local function buildGantry(plot: Model, origin: CFrame)
 	end
 
 	uprightCylinder(gantry, "Base", 9, 0.5, bagPos + Vector3.new(0, 0.25, 0), Color3.fromRGB(12, 12, 16))
-	local disc = uprightCylinder(gantry, "Disc", 7, 0.2, bagPos + Vector3.new(0, 0.6, 0), P.cyan, Enum.Material.Neon)
+	local disc = uprightCylinder(gantry, "Disc", 7, 0.2, bagPos + Vector3.new(0, 0.6, 0), T.neon, Enum.Material.Neon)
 	disc.CanCollide = false
 
 	-- O saco é um Model com pivô no ponto onde pendura: o cliente balança com PivotTo.
@@ -533,7 +537,7 @@ local function buildGantry(plot: Model, origin: CFrame)
 
 	-- bloco verde em degraus ao lado do pórtico: upgrade do saco
 	local upgradePos = bagPos + Vector3.new(4, 0, 9)
-	part(gantry, { name = "UpgradeStep", size = Vector3.new(5, 1, 5), cframe = CFrame.new(upgradePos + Vector3.new(0, 0.9, 0)), color = P.grassDark })
+	part(gantry, { name = "UpgradeStep", size = Vector3.new(5, 1, 5), cframe = CFrame.new(upgradePos + Vector3.new(0, 0.9, 0)), color = T.step })
 	local upgrade = part(gantry, { name = "Upgrade", size = Vector3.new(3.4, 2.4, 3.4), cframe = CFrame.new(upgradePos + Vector3.new(0, 2.6, 0)), color = Color3.fromRGB(60, 230, 90) })
 	local upgradePrompt = Instance.new("ProximityPrompt")
 	upgradePrompt.Name = "Prompt"
@@ -564,7 +568,7 @@ local function buildGantry(plot: Model, origin: CFrame)
 	gantry.Parent = plot
 end
 
-local function buildPedestal(plot: Model, origin: CFrame, index: number, offset: Vector3, cost: number)
+local function buildPedestal(plot: Model, origin: CFrame, index: number, offset: Vector3, cost: number, T: PlotTheme)
 	local pedestal = Instance.new("Model")
 	pedestal.Name = "Pedestal" .. index
 	pedestal:SetAttribute("PedestalIndex", index)
@@ -573,12 +577,12 @@ local function buildPedestal(plot: Model, origin: CFrame, index: number, offset:
 	local diameter = Config.Plot.pedestalDiameter
 	local base = (origin * CFrame.new(offset.X, slab, offset.Z)).Position
 	-- redondo e elevado: anel de neon na laje, corpo escuro, friso e tampo onde o personagem fica
-	local rim = uprightCylinder(pedestal, "Rim", diameter + 1.2, 0.2, base + Vector3.new(0, 0.1, 0), P.cyan, Enum.Material.Neon)
+	local rim = uprightCylinder(pedestal, "Rim", diameter + 1.2, 0.2, base + Vector3.new(0, 0.1, 0), T.neon, Enum.Material.Neon)
 	rim.CanCollide = false
-	uprightCylinder(pedestal, "Body", diameter, height - 0.3, base + Vector3.new(0, (height - 0.3) / 2, 0), P.navy)
-	local band = uprightCylinder(pedestal, "Band", diameter + 0.3, 0.25, base + Vector3.new(0, height - 0.55, 0), P.machineYellow)
+	uprightCylinder(pedestal, "Body", diameter, height - 0.3, base + Vector3.new(0, (height - 0.3) / 2, 0), T.frame)
+	local band = uprightCylinder(pedestal, "Band", diameter + 0.3, 0.25, base + Vector3.new(0, height - 0.55, 0), T.band)
 	band.CanCollide = false
-	local pad = uprightCylinder(pedestal, "Pad", diameter - 0.6, 0.3, base + Vector3.new(0, height - 0.15, 0), P.slab)
+	local pad = uprightCylinder(pedestal, "Pad", diameter - 0.6, 0.3, base + Vector3.new(0, height - 0.15, 0), T.pad)
 	pedestal.PrimaryPart = pad
 
 	local prompt = Instance.new("ProximityPrompt")
@@ -619,28 +623,31 @@ local function buildPedestal(plot: Model, origin: CFrame, index: number, offset:
 	pedestal.Parent = plot
 end
 
-function World.buildPlot(index: number): Model
+-- at e theme: para o mesmo terreno em outro mundo (sem eles, o do gramado).
+function World.buildPlot(index: number, at: CFrame?, theme: PlotTheme?): Model
 	local plot = Instance.new("Model")
 	plot.Name = "Plot" .. index
-	local origin = World.plotCFrame(index)
+	local origin = at or World.plotCFrame(index)
+	local T = theme or MEADOW
 	plot:SetAttribute("PlotId", index)
 	plot:SetAttribute("Origin", origin)
+	plot:SetAttribute("Accent", T.neon) -- cor do anel dos pedestais liberados
 
 	local px, pz = W.plotSize.X, W.plotSize.Y
-	local floor = part(plot, { name = "Floor", size = Vector3.new(px, 0.4, pz), cframe = origin * CFrame.new(0, 0.2, 0), color = P.sand })
+	local floor = part(plot, { name = "Floor", size = Vector3.new(px, 0.4, pz), cframe = origin * CFrame.new(0, 0.2, 0), color = T.floor, material = T.floorMaterial })
 	plot.PrimaryPart = floor
-	part(plot, { name = "Carpet", size = Vector3.new(12, 0.1, pz), cframe = origin * CFrame.new(0, 0.45, 0), color = P.red, collide = false })
+	part(plot, { name = "Carpet", size = Vector3.new(12, 0.1, pz), cframe = origin * CFrame.new(0, 0.45, 0), color = T.carpet, collide = false })
 
 	for _, side in { -1, 1 } do
 		local slabCenter = origin * CFrame.new(side * 18, 0.7, 8)
-		part(plot, { name = "Slab", size = Vector3.new(20, 0.6, 40), cframe = slabCenter, color = P.slab })
+		part(plot, { name = "Slab", size = Vector3.new(20, 0.6, 40), cframe = slabCenter, color = T.slab, material = T.floorMaterial })
 		-- contorno de neon ciano em volta da laje
 		for _, edge in { { 0, -20, 20.6, 0.5 }, { 0, 20, 20.6, 0.5 }, { -10, 0, 0.5, 40.6 }, { 10, 0, 0.5, 40.6 } } do
 			part(plot, {
 				name = "Neon",
 				size = Vector3.new(edge[3], 0.2, edge[4]),
 				cframe = slabCenter * CFrame.new(edge[1], 0.35, edge[2]),
-				color = P.cyan,
+				color = T.neon,
 				material = Enum.Material.Neon,
 				collide = false,
 			})
@@ -648,36 +655,116 @@ function World.buildPlot(index: number): Model
 	end
 
 	for i, info in Config.Plot.pedestals do
-		buildPedestal(plot, origin, i, info.offset, info.cost)
+		buildPedestal(plot, origin, i, info.offset, info.cost, T)
 	end
 
-	buildGantry(plot, origin)
+	buildGantry(plot, origin, T)
 
 	-- um só botão de coleta por terreno: mostra a soma do que todos os pedestais guardam;
 	-- pisar nele recolhe tudo
+	-- Placa de pressão: base escura de metal, friso dourado, e por cima a face verde desenhada
+	-- num SurfaceGui (cantos redondos, título numa faixa, moeda e o valor grande). A tela do
+	-- SurfaceGui fica em pé: 240 px no lado curto da placa, 480 no comprido.
+	local GOLD = Color3.fromRGB(255, 200, 70)
 	local collect = part(plot, {
 		name = "Collect",
 		size = Vector3.new(12, 0.5, 6),
 		cframe = origin * CFrame.new(Config.Plot.collectOffset.X, 0.65, Config.Plot.collectOffset.Z) * CFrame.Angles(0, math.rad(180), 0),
-		color = Color3.fromRGB(40, 200, 80),
+		color = Color3.fromRGB(14, 22, 20),
+		collide = false,
+	})
+	part(plot, {
+		name = "CollectBase",
+		size = Vector3.new(13.8, 0.4, 7.8),
+		cframe = collect.CFrame * CFrame.new(0, -0.2, 0),
+		color = T.frame,
+		material = Enum.Material.Metal,
 		collide = false,
 	})
 	part(plot, {
 		name = "CollectRim",
-		size = Vector3.new(13, 0.3, 7),
-		cframe = collect.CFrame * CFrame.new(0, -0.15, 0),
-		color = Color3.fromRGB(150, 255, 170),
+		size = Vector3.new(12.5, 0.3, 6.5),
+		cframe = collect.CFrame * CFrame.new(0, -0.05, 0),
+		color = GOLD,
 		material = Enum.Material.Neon,
 		collide = false,
 	})
+	for _, corner in { Vector2.new(-1, -1), Vector2.new(1, -1), Vector2.new(-1, 1), Vector2.new(1, 1) } do
+		local stud = uprightCylinder(plot, "CollectStud", 0.7, 0.3, (collect.CFrame * CFrame.new(corner.X * 6.45, 0.05, corner.Y * 3.45)).Position, GOLD, Enum.Material.Metal)
+		stud.CanCollide = false
+	end
 	local collectGui = Instance.new("SurfaceGui")
 	collectGui.Name = "Gui"
 	collectGui.Face = Enum.NormalId.Top
 	collectGui.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
 	collectGui.PixelsPerStud = 40
 	collectGui.LightInfluence = 0
-	label(collectGui, "Title", "COLLECT", Color3.fromRGB(255, 255, 255), UDim2.fromScale(0.9, 0.42), UDim2.fromScale(0.05, 0.06))
-	label(collectGui, "Amount", "$0", P.yellowLine, UDim2.fromScale(0.9, 0.5), UDim2.fromScale(0.05, 0.46))
+	collectGui.Brightness = 1.3
+	local function round(target: Instance, radius: number)
+		local corner = Instance.new("UICorner")
+		corner.CornerRadius = UDim.new(0, radius)
+		corner.Parent = target
+	end
+	local function outline(target: Instance, thickness: number, color: Color3)
+		local stroke = Instance.new("UIStroke")
+		stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+		stroke.Thickness = thickness
+		stroke.Color = color
+		stroke.Parent = target
+	end
+	local function shade(target: Instance, top: Color3, bottom: Color3)
+		local gradient = Instance.new("UIGradient")
+		gradient.Rotation = 90
+		gradient.Color = ColorSequence.new(top, bottom)
+		gradient.Parent = target
+	end
+	local back = Instance.new("Frame")
+	back.Name = "Back"
+	back.Size = UDim2.new(1, -16, 1, -16)
+	back.Position = UDim2.fromOffset(8, 8)
+	back.BackgroundColor3 = Color3.new(1, 1, 1)
+	back.BorderSizePixel = 0
+	round(back, 30)
+	outline(back, 5, Color3.fromRGB(170, 255, 200))
+	shade(back, Color3.fromRGB(52, 214, 110), Color3.fromRGB(12, 112, 62))
+	back.Parent = collectGui
+	-- brilho de vidro na metade de cima
+	local gloss = Instance.new("Frame")
+	gloss.Name = "Gloss"
+	gloss.Size = UDim2.new(1, -20, 0.22, 0)
+	gloss.Position = UDim2.fromOffset(10, 8)
+	gloss.BackgroundColor3 = Color3.new(1, 1, 1)
+	gloss.BackgroundTransparency = 0.86
+	gloss.BorderSizePixel = 0
+	round(gloss, 24)
+	gloss.Parent = back
+	local coin = Instance.new("TextLabel")
+	coin.Name = "Coin"
+	coin.AnchorPoint = Vector2.new(0.5, 0)
+	coin.Position = UDim2.new(0.5, 0, 0, 112)
+	coin.Size = UDim2.fromOffset(124, 124)
+	coin.BackgroundColor3 = Color3.new(1, 1, 1)
+	coin.Font = Enum.Font.FredokaOne
+	coin.Text = "$"
+	coin.TextSize = 90
+	coin.TextColor3 = Color3.fromRGB(150, 92, 0)
+	round(coin, 62)
+	outline(coin, 8, Color3.fromRGB(150, 92, 0))
+	shade(coin, Color3.fromRGB(255, 236, 130), Color3.fromRGB(255, 176, 30))
+	coin.Parent = collectGui
+	local title = Instance.new("TextLabel")
+	title.Name = "Title"
+	title.Position = UDim2.fromOffset(26, 36)
+	title.Size = UDim2.fromOffset(188, 46)
+	title.BackgroundColor3 = Color3.fromRGB(8, 60, 36)
+	title.Font = Enum.Font.GothamBlack
+	title.Text = "COLLECT"
+	title.TextSize = 29
+	title.TextColor3 = Color3.fromRGB(215, 255, 228)
+	round(title, 23)
+	outline(title, 3, Color3.fromRGB(120, 240, 170))
+	title.Parent = collectGui
+	label(collectGui, "Amount", "$0", P.yellowLine, UDim2.fromOffset(196, 150), UDim2.fromOffset(22, 268))
 	collectGui.Parent = collect
 
 	-- Ponto de nascimento no tapete, virado para o saco.
@@ -695,7 +782,7 @@ function World.buildPlot(index: number): Model
 	spawn.Duration = 0
 	spawn.Parent = plot
 
-	local anchor = part(plot, { name = "NameSign", size = Vector3.new(1, 1, 1), cframe = origin * CFrame.new(0, 14, -pz / 2), color = P.navy, transparency = 1, collide = false })
+	local anchor = part(plot, { name = "NameSign", size = Vector3.new(1, 1, 1), cframe = origin * CFrame.new(0, 14, -pz / 2), color = T.frame, transparency = 1, collide = false })
 	local board = Instance.new("BillboardGui")
 	board.Name = "Board"
 	board.Size = UDim2.fromScale(22, 3.5)

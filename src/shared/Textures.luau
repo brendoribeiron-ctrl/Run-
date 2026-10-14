@@ -6,6 +6,7 @@
 local Textures: { [string]: string } = {
 	-- <ids>
 	["circle"] = "rbxassetid://84364560595212",
+	["comet"] = "rbxassetid://84582397563706",
 	["flame"] = "rbxassetid://73004643767862",
 	["glow"] = "rbxassetid://79755305238513",
 	["ribbon"] = "rbxassetid://81148903023774",

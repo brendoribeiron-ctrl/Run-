@@ -64,8 +64,7 @@ local function parts(): (Humanoid?, BasePart?)
 end
 
 local function bagCenter(): Vector3?
-	local plots = workspace:FindFirstChild("Plots")
-	local plot = plots and plots:FindFirstChild("Plot" .. tostring(player:GetAttribute("PlotId")))
+	local plot = Config.plotOf(player)
 	local gantry = plot and plot:FindFirstChild("Gantry")
 	local bag = gantry and gantry:FindFirstChild("Bag")
 	local center = bag and bag:GetAttribute("Center")

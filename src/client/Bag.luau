@@ -327,19 +327,35 @@ function Bag.start()
 	local remotes = ReplicatedStorage:WaitForChild("Remotes")
 	local bagHit = remotes:WaitForChild("BagHit") :: RemoteEvent
 
-	task.spawn(function()
+	-- o saco é o do terreno do mundo em que o jogador está: ao viajar, troca para o de lá
+	local binding = 0
+	local function bind()
+		binding += 1
+		local mine = binding
+		bagModel = nil
 		while player:GetAttribute("PlotId") == nil do
 			player:GetAttributeChangedSignal("PlotId"):Wait()
 		end
-		local plot = workspace:WaitForChild("Plots"):WaitForChild("Plot" .. tostring(player:GetAttribute("PlotId")))
-		local model = plot:WaitForChild("Gantry"):WaitForChild("Bag") :: Model
-		local body = model:WaitForChild("Body")
-		model:WaitForChild("Chain")
+		local folder = workspace:WaitForChild(Config.worldOf(player).plots, 60)
+		local plot = folder and folder:WaitForChild("Plot" .. tostring(player:GetAttribute("PlotId")), 60)
+		local gantry = plot and plot:WaitForChild("Gantry", 60)
+		local model = gantry and gantry:WaitForChild("Bag", 60)
+		local body = model and model:WaitForChild("Body", 60)
+		if mine ~= binding or not model or not model:IsA("Model") or not body or not model:WaitForChild("Chain", 60) then
+			return
+		end
 		bagCenter = model:GetAttribute("Center") :: Vector3
 		restPivot = model:GetPivot()
 		local found = body:WaitForChild("Hint", 5)
+		if mine ~= binding then
+			return
+		end
 		hint = if found and found:IsA("BillboardGui") then found else nil
 		bagModel = model
+	end
+	task.spawn(bind)
+	player:GetAttributeChangedSignal("World"):Connect(function()
+		task.spawn(bind)
 	end)
 
 	bagHit.OnClientEvent:Connect(onHit)

@@ -79,5 +79,19 @@ check("reset limpa inventário, pedestais e índice", #s.inventory == 0 and next
 check("reset tira aura, montaria, skills e automáticos", s.aura == "" and s.mount == "" and next(s.mounts) == nil and next(s.stats) == nil and next(s.unlocks) == nil and next(s.levels) == nil, s.aura)
 check("reset limpa o terreno", plot.Pedestal1:FindFirstChild("Character") == nil and player:GetAttribute("Power") == 0 and player:GetAttribute("Inventory") == "", "terreno")
 check("no Studio todo mundo é admin", hook:Invoke("isAdmin", player) == true, "não é admin")
+check("jogorui está na lista de admins", table.find(Config.Admins, 10098933976) ~= nil, "fora da lista")
+
+-- /give power|money <quantia> [jogador]
+hook:Invoke("set", player, { power = 0, money = 0 })
+hook:Invoke("giveCommand", player, "/give power 5M")
+check("/give power soma Poder", state().power == 5_000_000, tostring(state().power))
+hook:Invoke("giveCommand", player, "/give money 2.5k")
+check("/give money soma dinheiro", state().money == 2_500 and state().power == 5_000_000, tostring(state().money))
+hook:Invoke("giveCommand", player, `/give Money 1b "{string.sub(player.Name, 1, 3)}"`)
+check("/give aceita o nome entre aspas e pelo começo", state().money == 1_000_002_500, tostring(state().money))
+local usage = hook:Invoke("giveCommand", player, "/give gems 10")
+check("/give recusa o que não é Poder nem dinheiro", string.find(usage, "Usage") ~= nil and state().money == 1_000_002_500, usage)
+check("/give recusa quantia inválida", string.find(hook:Invoke("giveCommand", player, "/give power -5"), "Usage") ~= nil and string.find(hook:Invoke("giveCommand", player, "/give power abc"), "Usage") ~= nil and state().power == 5_000_000, tostring(state().power))
+check("/give avisa quando o jogador não está no servidor", string.find(hook:Invoke("giveCommand", player, "/give power 10 zzzninguem"), "No player") ~= nil and state().power == 5_000_000, tostring(state().power))
 
 return `{#passed} verificações OK: ` .. table.concat(passed, "; ") .. ` | {crits} críticos em {hits} socos`

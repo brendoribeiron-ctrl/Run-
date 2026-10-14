@@ -26,6 +26,7 @@ local Assets: { [string]: string } = {
 	["volcano_base"] = "rbxassetid://124467863613565",
 	["volcano_mount"] = "rbxassetid://132530076087945",
 	["volcano_spire"] = "rbxassetid://98126233394367",
+	["volcano_terrace"] = "rbxassetid://86974312399773",
 	["volcano_track"] = "rbxassetid://77192793748371",
 	["wizard"] = "rbxassetid://75831952071316",
 	-- </ids>

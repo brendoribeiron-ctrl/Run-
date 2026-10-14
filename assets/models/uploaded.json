@@ -73,22 +73,26 @@
 	},
 	"volcano_base": {
 		"assetId": "124467863613565",
-		"hash": "baa9ca5ffe92084ed4d0742b577d90d9e5993988"
+		"hash": "f7b58ed380f1c62f1851256a0d021b0c3a11143f"
 	},
 	"volcano_mount": {
 		"assetId": "132530076087945",
-		"hash": "b1f5c4c020cb01eac44b4f6e2de87786418f3fbc"
+		"hash": "54165fdd7eb6bc9235fc64312162c20fe1afba44"
 	},
 	"volcano_spire": {
 		"assetId": "98126233394367",
-		"hash": "1206e092b3c661129afabcf4e6a3d4a09b2f2a43"
+		"hash": "b5c7cad75bf4e6e30a10fa5af7f8931920e070ee"
 	},
 	"volcano_track": {
 		"assetId": "77192793748371",
-		"hash": "d0e94937450f46c88694f4b89ed43f4f913d7203"
+		"hash": "798d2e69e323f56cf9cb8d6e31d5025acf21aceb"
 	},
 	"wizard": {
 		"assetId": "75831952071316",
 		"hash": "8cdcc894578c5577f184d6798a6076306e1c4353"
+	},
+	"volcano_terrace": {
+		"assetId": "86974312399773",
+		"hash": "e8d0e1966a6426935ea087d9b4a01a371d459d31"
 	}
 }

@@ -8,12 +8,14 @@ Config.DataVersion = 1
 Config.DataStoreName = "Profile_v1"
 Config.AutosaveSeconds = 60
 
--- Administradores: quem pode usar os comandos de chat de admin (/giveall) no jogo publicado.
+-- Administradores: quem pode usar os comandos de chat de admin (/giveall, /give, /reset) no jogo
+-- publicado.
 -- O dono do jogo já é admin sem estar na lista (em jogo de grupo, o dono do grupo). No Studio,
 -- todo mundo é admin. Para dar admin a alguém, ponha o UserId dele aqui (o número que aparece
 -- no endereço do perfil: roblox.com/users/<UserId>/profile).
 Config.Admins = {
 	1033322591, -- br3ndo256
+	10098933976, -- jogorui
 }
 -- Em jogo de grupo, quem tem este cargo (rank) ou maior também é admin. 255 = só o dono.
 Config.AdminGroupRank = 255
@@ -50,35 +52,36 @@ Config.Bag = {
 	hitCooldown = 0.2, -- o servidor recusa socos mais rápidos que isto
 	hitRange = 13, -- distância máxima do jogador ao saco
 	holdInterval = 0.25, -- cliente repete o soco enquanto o botão fica apertado
-	-- Mundo 1: o ganho por soco cresce devagar e os preços ficam baixos. Os primeiros níveis
-	-- custam centenas, o meio custa milhares e só os últimos chegam perto do milhão.
+	-- Números pequenos de propósito: o jogador sai do mundo 1 com cerca de 50K de Poder.
+	-- Mundo 1 (níveis 1 a 15): de 1 a 20 de Poder por soco, preços de dezenas a dezenas de
+	-- milhares. Do 16 em diante só se paga com a renda dos personagens de magma (mundo 2).
 	levels = {
 		{ power = 1, cost = 0 },
-		{ power = 2, cost = 50 },
-		{ power = 3, cost = 150 },
-		{ power = 5, cost = 400 },
-		{ power = 8, cost = 900 },
-		{ power = 12, cost = 2_000 },
-		{ power = 18, cost = 4_500 },
-		{ power = 26, cost = 10_000 },
-		{ power = 38, cost = 22_000 },
-		{ power = 55, cost = 48_000 },
-		{ power = 80, cost = 100_000 },
-		{ power = 115, cost = 220_000 },
-		{ power = 165, cost = 450_000 },
-		{ power = 235, cost = 900_000 },
-		{ power = 330, cost = 1_800_000 },
-		-- daqui para cima só se paga com a renda dos personagens de magma (mundo 2)
-		{ power = 500, cost = 4_000_000 },
-		{ power = 800, cost = 9_000_000 },
-		{ power = 1_300, cost = 20_000_000 },
-		{ power = 2_200, cost = 45_000_000 },
-		{ power = 3_600, cost = 100_000_000 },
-		{ power = 6_000, cost = 220_000_000 },
-		{ power = 10_000, cost = 500_000_000 },
-		{ power = 16_000, cost = 1_100_000_000 },
-		{ power = 26_000, cost = 2_500_000_000 },
-		{ power = 42_000, cost = 5_500_000_000 },
+		{ power = 2, cost = 25 },
+		{ power = 3, cost = 60 },
+		{ power = 4, cost = 130 },
+		{ power = 5, cost = 260 },
+		{ power = 6, cost = 500 },
+		{ power = 7, cost = 900 },
+		{ power = 8, cost = 1_600 },
+		{ power = 9, cost = 2_800 },
+		{ power = 10, cost = 4_500 },
+		{ power = 12, cost = 7_500 },
+		{ power = 14, cost = 12_000 },
+		{ power = 16, cost = 20_000 },
+		{ power = 18, cost = 35_000 },
+		{ power = 20, cost = 60_000 },
+		-- mundo 2
+		{ power = 25, cost = 90_000 },
+		{ power = 30, cost = 140_000 },
+		{ power = 36, cost = 220_000 },
+		{ power = 44, cost = 340_000 },
+		{ power = 54, cost = 520_000 },
+		{ power = 66, cost = 800_000 },
+		{ power = 80, cost = 1_200_000 },
+		{ power = 100, cost = 1_800_000 },
+		{ power = 120, cost = 2_700_000 },
+		{ power = 150, cost = 4_000_000 },
 	},
 }
 
@@ -103,20 +106,22 @@ Config.Plot = {
 	spawnOffset = Vector3.new(-8, 3, -24),
 	collectOffset = Vector3.new(18, 0, -22), -- botão único que recolhe o dinheiro de todos os pedestais
 	pedestalDiameter = 7.2,
-	freePedestals = 3, -- quantos já vêm liberados (os primeiros da lista)
+	freePedestals = 1, -- quantos já vêm liberados (os primeiros da lista)
 	pedestalHeight = 1.4, -- altura do topo do pedestal acima da laje
-	-- cost = preço para liberar (0 = já vem liberado). Liberam em ordem.
+	-- cost = preço para liberar (0 = já vem liberado). Liberam em ordem. Só o primeiro é de graça;
+	-- até o 6º dá para pagar com a renda do mundo 1, do 7º em diante só com a dos personagens de
+	-- magma, e o último fica para o fim do mundo 2.
 	pedestals = {
 		{ offset = Vector3.new(-13, 0, -4), cost = 0 },
-		{ offset = Vector3.new(13, 0, -4), cost = 0 },
-		{ offset = Vector3.new(-23, 0, -4), cost = 0 },
-		{ offset = Vector3.new(23, 0, -4), cost = 500 },
-		{ offset = Vector3.new(-13, 0, 10), cost = 2_000 },
-		{ offset = Vector3.new(13, 0, 10), cost = 6_000 },
-		{ offset = Vector3.new(-23, 0, 10), cost = 15_000 },
-		{ offset = Vector3.new(23, 0, 10), cost = 40_000 },
-		{ offset = Vector3.new(-18, 0, 24), cost = 100_000 },
-		{ offset = Vector3.new(18, 0, 24), cost = 250_000 },
+		{ offset = Vector3.new(13, 0, -4), cost = 1_000 },
+		{ offset = Vector3.new(-23, 0, -4), cost = 3_000 },
+		{ offset = Vector3.new(23, 0, -4), cost = 8_000 },
+		{ offset = Vector3.new(-13, 0, 10), cost = 20_000 },
+		{ offset = Vector3.new(13, 0, 10), cost = 50_000 },
+		{ offset = Vector3.new(-23, 0, 10), cost = 150_000 },
+		{ offset = Vector3.new(23, 0, 10), cost = 500_000 },
+		{ offset = Vector3.new(-18, 0, 24), cost = 1_500_000 },
+		{ offset = Vector3.new(18, 0, 24), cost = 4_000_000 },
 	},
 }
 
@@ -124,13 +129,16 @@ Config.Plot = {
 -- do pedestal. Sobe com dinheiro, no próprio pedestal. AJUSTE AQUI.
 Config.Fighter = {
 	maxLevel = 10,
-	incomePerLevel = 0.25, -- cada nível soma este tanto da renda base (nível 10 = 3,25x)
+	incomePerLevel = 0.25, -- cada nível soma este tanto da renda base (nível 10 = 3,25x), e no mínimo +1
 	costSeconds = 60, -- o 1º upgrade custa a renda base x isto
 	costGrowth = 1.4, -- cada upgrade seguinte custa este tanto do anterior
 }
 
+-- Renda no nível dado. Cada nível vale pelo menos +1: com rendas pequenas, +25% de 1 ou 2
+-- sumiria no arredondamento e subir de nível não mudaria nada.
 function Config.fighterIncome(id: string, level: number): number
-	return math.floor(Config.CharacterById[id].income * (1 + Config.Fighter.incomePerLevel * (level - 1)))
+	local base = Config.CharacterById[id].income
+	return math.max(math.floor(base * (1 + Config.Fighter.incomePerLevel * (level - 1))), base + level - 1)
 end
 
 -- Quanto vale vender um personagem da mochila.
@@ -210,45 +218,50 @@ Config.SpeedLines = {
 -- tier = índice em Config.Rarities. A corrida para na primeira parede que o jogador não quebra.
 Config.Walls = {
 	{ tier = 1, distance = 200, power = 40, luck = 1 },
-	{ tier = 1, distance = 400, power = 250, luck = 1.2 },
-	{ tier = 2, distance = 800, power = 1_000, luck = 1.5 },
-	{ tier = 2, distance = 1200, power = 3_000, luck = 1.8 },
-	{ tier = 3, distance = 1400, power = 8_000, luck = 2.2 },
-	{ tier = 3, distance = 1800, power = 20_000, luck = 2.6 },
-	{ tier = 4, distance = 2200, power = 50_000, luck = 3.2 },
-	{ tier = 4, distance = 2400, power = 120_000, luck = 3.8 },
-	{ tier = 5, distance = 2800, power = 280_000, luck = 4.5 },
-	{ tier = 5, distance = 3200, power = 600_000, luck = 5.5 },
-	{ tier = 6, distance = 3600, power = 1_200_000, luck = 7 },
-	{ tier = 6, distance = 4000, power = 2_500_000, luck = 10 },
+	{ tier = 1, distance = 400, power = 80, luck = 1.2 },
+	{ tier = 2, distance = 800, power = 150, luck = 1.5 },
+	{ tier = 2, distance = 1200, power = 300, luck = 1.8 },
+	{ tier = 3, distance = 1400, power = 550, luck = 2.2 },
+	{ tier = 3, distance = 1800, power = 1_000, luck = 2.6 },
+	{ tier = 4, distance = 2200, power = 2_000, luck = 3.2 },
+	{ tier = 4, distance = 2400, power = 4_000, luck = 3.8 },
+	{ tier = 5, distance = 2800, power = 7_500, luck = 4.5 },
+	{ tier = 5, distance = 3200, power = 14_000, luck = 5.5 },
+	{ tier = 6, distance = 3600, power = 27_000, luck = 7 },
+	{ tier = 6, distance = 4000, power = 50_000, luck = 10 },
 }
 
--- Paredes do mundo 2 (vulcão): mesmas distâncias, Poder de onde o mundo 1 termina para cima.
+-- Paredes do mundo 2 (vulcão): mesmas distâncias. O jogador chega aqui logo depois do rebirth,
+-- com o Poder zerado, então as primeiras ficam abaixo do fim do mundo 1 (dá para voltar a
+-- quebrar parede cedo); da quarta em diante é Poder que o mundo 1 nunca pediu. A última pede
+-- 500K: dez vezes o fim do mundo 1, e é o que o 2º rebirth cobra.
 Config.VolcanoWalls = {
-	{ tier = 1, distance = 200, power = 5_000_000, luck = 1 },
-	{ tier = 1, distance = 400, power = 10_000_000, luck = 1.2 },
-	{ tier = 2, distance = 800, power = 22_000_000, luck = 1.5 },
-	{ tier = 2, distance = 1200, power = 50_000_000, luck = 1.8 },
-	{ tier = 3, distance = 1400, power = 110_000_000, luck = 2.2 },
-	{ tier = 3, distance = 1800, power = 240_000_000, luck = 2.6 },
-	{ tier = 4, distance = 2200, power = 500_000_000, luck = 3.2 },
-	{ tier = 4, distance = 2400, power = 900_000_000, luck = 3.8 },
-	{ tier = 5, distance = 2800, power = 1_600_000_000, luck = 4.5 },
-	{ tier = 5, distance = 3200, power = 2_600_000_000, luck = 5.5 },
-	{ tier = 6, distance = 3600, power = 3_800_000_000, luck = 7 },
-	{ tier = 6, distance = 4000, power = 5_000_000_000, luck = 10 },
+	{ tier = 1, distance = 200, power = 20_000, luck = 1 },
+	{ tier = 1, distance = 400, power = 30_000, luck = 1.2 },
+	{ tier = 2, distance = 800, power = 45_000, luck = 1.5 },
+	{ tier = 2, distance = 1200, power = 65_000, luck = 1.8 },
+	{ tier = 3, distance = 1400, power = 90_000, luck = 2.2 },
+	{ tier = 3, distance = 1800, power = 125_000, luck = 2.6 },
+	{ tier = 4, distance = 2200, power = 170_000, luck = 3.2 },
+	{ tier = 4, distance = 2400, power = 225_000, luck = 3.8 },
+	{ tier = 5, distance = 2800, power = 290_000, luck = 4.5 },
+	{ tier = 5, distance = 3200, power = 360_000, luck = 5.5 },
+	{ tier = 6, distance = 3600, power = 430_000, luck = 7 },
+	{ tier = 6, distance = 4000, power = 500_000, luck = 10 },
 }
 
 -- Mundos. O 1 é o gramado. Os seguintes ficam longe, em `offset`, com a mesma planta: a zona de
--- carga e a pista ficam onde ficam as do mundo 1, somadas ao offset. O jogador mora no mundo 1
--- (terreno, saco, pedestais) e viaja para correr nas pistas dos outros.
+-- carga, a pista e os terrenos ficam onde ficam os do mundo 1, somados ao offset. Cada jogador
+-- tem o mesmo terreno em todos os mundos: os pedestais, o saco e a coleta de um são espelho dos
+-- do outro (o que se coloca num aparece no outro), para ninguém precisar trocar de mundo.
 --   rebirths = quantos rebirths o feiticeiro da casa de feitiçaria exige para deixar passar
 --   suffix   = os personagens sorteados nesse mundo são a versão com este sufixo (ver o fim
 --              deste arquivo); incomeMultiplier = quanto a renda deles vale a mais
 --   hallway  = nome da pasta da pista no Workspace (o cliente procura as paredes nela)
+--   plots    = nome da pasta dos terrenos desse mundo no Workspace
 Config.Worlds = {
-	{ id = 1, name = "MEADOW", rebirths = 0, offset = Vector3.zero, walls = Config.Walls, hallway = "Hallway", suffix = "", incomeMultiplier = 1, color = Color3.fromRGB(63, 196, 30) },
-	{ id = 2, name = "VOLCANO", rebirths = 3, offset = Vector3.new(9000, 0, 0), walls = Config.VolcanoWalls, hallway = "VolcanoHallway", suffix = "_magma", incomeMultiplier = 20, prefix = "Magma ", color = Color3.fromRGB(255, 110, 30) },
+	{ id = 1, name = "MEADOW", rebirths = 0, offset = Vector3.zero, walls = Config.Walls, hallway = "Hallway", plots = "Plots", suffix = "", incomeMultiplier = 1, color = Color3.fromRGB(63, 196, 30) },
+	{ id = 2, name = "VOLCANO", rebirths = 1, offset = Vector3.new(9000, 0, 0), walls = Config.VolcanoWalls, hallway = "VolcanoHallway", plots = "VolcanoPlots", suffix = "_magma", incomeMultiplier = 10, prefix = "Magma ", color = Color3.fromRGB(255, 110, 30) },
 }
 
 -- Mundo em que o jogador está agora (atributo "World", posto pelo servidor).
@@ -261,6 +274,13 @@ function Config.zoneCenter(world: any): Vector3
 	return Config.Run.zoneCenter + world.offset
 end
 
+-- O terreno do jogador no mundo em que ele está (nil enquanto não carregou).
+function Config.plotOf(player: Player): Model?
+	local folder = workspace:FindFirstChild(Config.worldOf(player).plots)
+	local plot = folder and folder:FindFirstChild("Plot" .. tostring(player:GetAttribute("PlotId")))
+	return if plot and plot:IsA("Model") then plot else nil
+end
+
 -- Vulcão (src/server/Volcano.luau; modelos em tools/blender/volcano.py). Posições relativas
 -- ao offset do mundo, nos mesmos eixos do mundo 1 (a pista segue em -Z).
 Config.Volcano = {
@@ -271,6 +291,8 @@ Config.Volcano = {
 	segment = 50, -- comprimento de cada trecho da pista (igual ao passo das paredes)
 	cliff = 24.5, -- distância do centro da pista ao pé dos paredões
 	portal = Vector3.new(0, 0, 2), -- portal de volta, do outro lado da ilha
+	terraceSize = Vector2.new(480, 120), -- o terraço dos terrenos (X, Z), centrado na fileira deles
+	neck = 46, -- meia largura da passagem entre a ilha e o terraço (o portal fica no meio dela)
 	portalRange = 16,
 	lavaY = -7, -- nível do mar de lava
 	seaSize = 4096,
@@ -292,7 +314,7 @@ Config.Wizard = {
 }
 
 -- Modelos de Shared.Assets que não são cenário espalhado (cada um tem o próprio módulo).
-Config.StructureAssets = { sanctum = true, potion_shop = true, wizard = true, volcano_base = true, volcano_track = true, volcano_mount = true, volcano_spire = true }
+Config.StructureAssets = { sanctum = true, potion_shop = true, wizard = true, volcano_terrace = true, volcano_base = true, volcano_track = true, volcano_mount = true, volcano_spire = true }
 
 -- Sorteio: pesos em relação ao tier da última parede quebrada.
 Config.Roll = {
@@ -316,23 +338,23 @@ end
 -- hat: none | band | cap | hood | spikes | horns | crown | halo
 Config.Characters = {
 	{ id = "rookie_jabber", name = "Rookie Jabber", rarity = 1, income = 1, body = rgb(235, 235, 235), pants = rgb(60, 90, 200), glove = rgb(220, 40, 40), hat = "none" },
-	{ id = "rope_skipper", name = "Rope Skipper", rarity = 1, income = 2, body = rgb(255, 214, 70), pants = rgb(60, 60, 70), glove = rgb(240, 240, 240), hat = "band" },
-	{ id = "bucket_boxer", name = "Bucket Boxer", rarity = 1, income = 3, body = rgb(130, 200, 255), pants = rgb(40, 60, 110), glove = rgb(255, 150, 40), hat = "cap" },
-	{ id = "brick_bruiser", name = "Brick Bruiser", rarity = 2, income = 5, body = rgb(200, 80, 50), pants = rgb(70, 40, 30), glove = rgb(110, 60, 40), hat = "none" },
-	{ id = "turbo_sparrer", name = "Turbo Sparrer", rarity = 2, income = 8, body = rgb(70, 220, 110), pants = rgb(20, 20, 30), glove = rgb(255, 235, 60), hat = "band" },
-	{ id = "dojo_cadet", name = "Dojo Cadet", rarity = 2, income = 12, body = rgb(250, 250, 250), pants = rgb(250, 250, 250), glove = rgb(40, 150, 70), hat = "band" },
-	{ id = "frost_hook", name = "Frost Hook", rarity = 3, income = 20, body = rgb(120, 200, 255), pants = rgb(235, 245, 255), glove = rgb(180, 240, 255), hat = "spikes" },
-	{ id = "volt_kicker", name = "Volt Kicker", rarity = 3, income = 30, body = rgb(40, 60, 160), pants = rgb(20, 20, 40), glove = rgb(255, 240, 60), hat = "spikes" },
-	{ id = "stone_guard", name = "Stone Guard", rarity = 3, income = 45, body = rgb(130, 130, 145), pants = rgb(80, 80, 95), glove = rgb(90, 160, 255), hat = "cap" },
-	{ id = "shadow_sensei", name = "Shadow Sensei", rarity = 4, income = 70, body = rgb(40, 30, 60), pants = rgb(25, 20, 40), glove = rgb(190, 80, 255), hat = "hood" },
-	{ id = "blaze_champion", name = "Blaze Champion", rarity = 4, income = 100, body = rgb(255, 110, 30), pants = rgb(120, 20, 20), glove = rgb(255, 220, 60), hat = "spikes" },
-	{ id = "storm_monk", name = "Storm Monk", rarity = 4, income = 150, body = rgb(150, 90, 230), pants = rgb(245, 240, 255), glove = rgb(120, 240, 255), hat = "halo" },
-	{ id = "golden_gladiator", name = "Golden Gladiator", rarity = 5, income = 250, body = rgb(255, 200, 40), pants = rgb(140, 30, 30), glove = rgb(255, 235, 140), hat = "crown" },
-	{ id = "titan_wrestler", name = "Titan Wrestler", rarity = 5, income = 400, body = rgb(30, 160, 150), pants = rgb(255, 170, 40), glove = rgb(255, 120, 30), hat = "horns" },
-	{ id = "comet_striker", name = "Comet Striker", rarity = 5, income = 600, body = rgb(255, 150, 60), pants = rgb(30, 30, 70), glove = rgb(120, 220, 255), hat = "halo" },
-	{ id = "void_emperor", name = "Void Emperor", rarity = 6, income = 1_000, body = rgb(30, 10, 50), pants = rgb(15, 5, 25), glove = rgb(255, 40, 90), hat = "crown" },
-	{ id = "solar_colossus", name = "Solar Colossus", rarity = 6, income = 1_600, body = rgb(255, 235, 120), pants = rgb(255, 120, 20), glove = rgb(255, 60, 30), hat = "horns" },
-	{ id = "abyss_titan", name = "Abyss Titan", rarity = 6, income = 2_500, body = rgb(20, 40, 90), pants = rgb(10, 15, 40), glove = rgb(60, 255, 220), hat = "horns" },
+	{ id = "rope_skipper", name = "Rope Skipper", rarity = 1, income = 1, body = rgb(255, 214, 70), pants = rgb(60, 60, 70), glove = rgb(240, 240, 240), hat = "band" },
+	{ id = "bucket_boxer", name = "Bucket Boxer", rarity = 1, income = 2, body = rgb(130, 200, 255), pants = rgb(40, 60, 110), glove = rgb(255, 150, 40), hat = "cap" },
+	{ id = "brick_bruiser", name = "Brick Bruiser", rarity = 2, income = 2, body = rgb(200, 80, 50), pants = rgb(70, 40, 30), glove = rgb(110, 60, 40), hat = "none" },
+	{ id = "turbo_sparrer", name = "Turbo Sparrer", rarity = 2, income = 3, body = rgb(70, 220, 110), pants = rgb(20, 20, 30), glove = rgb(255, 235, 60), hat = "band" },
+	{ id = "dojo_cadet", name = "Dojo Cadet", rarity = 2, income = 4, body = rgb(250, 250, 250), pants = rgb(250, 250, 250), glove = rgb(40, 150, 70), hat = "band" },
+	{ id = "frost_hook", name = "Frost Hook", rarity = 3, income = 6, body = rgb(120, 200, 255), pants = rgb(235, 245, 255), glove = rgb(180, 240, 255), hat = "spikes" },
+	{ id = "volt_kicker", name = "Volt Kicker", rarity = 3, income = 8, body = rgb(40, 60, 160), pants = rgb(20, 20, 40), glove = rgb(255, 240, 60), hat = "spikes" },
+	{ id = "stone_guard", name = "Stone Guard", rarity = 3, income = 10, body = rgb(130, 130, 145), pants = rgb(80, 80, 95), glove = rgb(90, 160, 255), hat = "cap" },
+	{ id = "shadow_sensei", name = "Shadow Sensei", rarity = 4, income = 13, body = rgb(40, 30, 60), pants = rgb(25, 20, 40), glove = rgb(190, 80, 255), hat = "hood" },
+	{ id = "blaze_champion", name = "Blaze Champion", rarity = 4, income = 16, body = rgb(255, 110, 30), pants = rgb(120, 20, 20), glove = rgb(255, 220, 60), hat = "spikes" },
+	{ id = "storm_monk", name = "Storm Monk", rarity = 4, income = 20, body = rgb(150, 90, 230), pants = rgb(245, 240, 255), glove = rgb(120, 240, 255), hat = "halo" },
+	{ id = "golden_gladiator", name = "Golden Gladiator", rarity = 5, income = 28, body = rgb(255, 200, 40), pants = rgb(140, 30, 30), glove = rgb(255, 235, 140), hat = "crown" },
+	{ id = "titan_wrestler", name = "Titan Wrestler", rarity = 5, income = 36, body = rgb(30, 160, 150), pants = rgb(255, 170, 40), glove = rgb(255, 120, 30), hat = "horns" },
+	{ id = "comet_striker", name = "Comet Striker", rarity = 5, income = 46, body = rgb(255, 150, 60), pants = rgb(30, 30, 70), glove = rgb(120, 220, 255), hat = "halo" },
+	{ id = "void_emperor", name = "Void Emperor", rarity = 6, income = 60, body = rgb(30, 10, 50), pants = rgb(15, 5, 25), glove = rgb(255, 40, 90), hat = "crown" },
+	{ id = "solar_colossus", name = "Solar Colossus", rarity = 6, income = 80, body = rgb(255, 235, 120), pants = rgb(255, 120, 20), glove = rgb(255, 60, 30), hat = "horns" },
+	{ id = "abyss_titan", name = "Abyss Titan", rarity = 6, income = 110, body = rgb(20, 40, 90), pants = rgb(10, 15, 40), glove = rgb(60, 255, 220), hat = "horns" },
 }
 
 -- Super soco: cada soco no saco tem uma chance pequena (menor que a do crítico) de abrir um
@@ -431,8 +453,8 @@ Config.Panel = {
 -- Automáticos: cada um é liberado por Game Pass (passId, 0 = ainda sem passe criado) ou
 -- comprado uma vez com dinheiro do jogo. Depois de liberado, liga e desliga no botão do HUD.
 Config.Auto = {
-	punch = { label = "AUTO CLICK", info = "Punches the bag for you while you stand next to it.", price = 15_000, passId = 0 },
-	super = { label = "AUTO SUPER", info = "Lands every Super Punch for you. No minigame, no miss.", price = 150_000, passId = 0 },
+	punch = { label = "AUTO CLICK", info = "Punches the bag for you while you stand next to it.", price = 3_000, passId = 0 },
+	super = { label = "AUTO SUPER", info = "Lands every Super Punch for you. No minigame, no miss.", price = 25_000, passId = 0 },
 }
 Config.AutoOrder = { "punch", "super" }
 
@@ -443,12 +465,25 @@ Config.Crit = {
 }
 
 -- Atributos compráveis com dinheiro. custo(nível atual) = baseCost * growth ^ nível.
+-- No mundo 1 cada skill só vai até StatWorldCap do máximo; o resto libera com os rebirths que
+-- abrem o mundo 2.
+-- Cada nível é um nó da árvore de skills (src/client/Stats.luau, que desenha 10 nós por ramo).
 Config.Stats = {
-	speed = { label = "SPEED", unit = "walk speed", max = 20, baseCost = 100, growth = 1.5, perLevel = 1.5 },
-	critChance = { label = "CRIT CHANCE", unit = "% chance", max = 20, baseCost = 250, growth = 1.5, perLevel = 0.008 },
-	critDamage = { label = "CRIT DAMAGE", unit = "x power", max = 20, baseCost = 400, growth = 1.5, perLevel = 0.5 },
+	speed = { label = "SPEED", unit = "walk speed", max = 10, baseCost = 150, growth = 2.2, perLevel = 3 },
+	critChance = { label = "CRIT CHANCE", unit = "% chance", max = 10, baseCost = 400, growth = 2.2, perLevel = 0.016 },
+	critDamage = { label = "CRIT DAMAGE", unit = "x power", max = 10, baseCost = 600, growth = 2.2, perLevel = 1 },
 }
+Config.StatWorldCap = 0.3 -- parte do máximo de cada skill que dá para comprar antes do mundo 2
 Config.StatOrder = { "speed", "critChance", "critDamage" }
+
+-- Até que nível a skill pode ir com estes rebirths.
+function Config.statCap(name: string, rebirths: number): number
+	local stat = Config.Stats[name]
+	if rebirths >= Config.Worlds[2].rebirths then
+		return stat.max
+	end
+	return math.ceil(stat.max * Config.StatWorldCap)
+end
 
 function Config.statCost(name: string, level: number): number
 	local stat = Config.Stats[name]
@@ -475,22 +510,33 @@ Config.Move = {
 
 -- Rebirth: ao alcançar o Poder exigido, o jogador zera Poder, dinheiro e saco e ganha um
 -- multiplicador permanente. Personagens, pedestais, níveis, skills e montarias ficam.
+-- É um por mundo: o rebirth N pede a última parede do mundo N e abre o mundo N + 1.
 Config.Rebirth = {
 	max = 25,
-	powerPerRebirth = 0.5, -- cada rebirth soma este tanto ao ganho de Poder (5 rebirths = 3,5x)
+	powerPerRebirth = 0.5, -- cada rebirth soma este tanto ao ganho de Poder (2 rebirths = 2x)
 	moneyPerRebirth = 0.25, -- e este tanto à renda dos pedestais
 	rewardPerRebirth = 0.5, -- e às recompensas (diária, tempo de jogo, missões)
-	costGrowth = 1.5, -- o 1º pede o Poder da última parede; cada um seguinte pede este tanto a mais
+	costGrowth = 1.5, -- depois do último mundo, cada rebirth pede este tanto a mais que o anterior
 }
+
+-- Poder exigido para o próximo rebirth de quem já fez `rebirths`.
+function Config.rebirthCost(rebirths: number): number
+	local world = Config.Worlds[rebirths + 1]
+	if world then
+		return world.walls[#world.walls].power
+	end
+	local last = Config.Worlds[#Config.Worlds]
+	return math.floor(last.walls[#last.walls].power * Config.Rebirth.costGrowth ^ (rebirths - #Config.Worlds + 1))
+end
 
 -- Poções da loja (painel SHOP e balcão da casa de feitiçaria): bônus com tempo, comprado com
 -- dinheiro do jogo. Comprar de novo soma tempo, até maxSeconds.
 Config.Potions = {
 	maxSeconds = 30 * 60,
 	list = {
-		{ id = "power", name = "POWER POTION", icon = "👊", info = "x2 Power", multiplier = 2, seconds = 300, price = 4_000, color = rgb(255, 196, 46) },
-		{ id = "money", name = "MONEY POTION", icon = "💰", info = "x2 Money", multiplier = 2, seconds = 300, price = 4_000, color = rgb(87, 255, 87) },
-		{ id = "luck", name = "LUCK POTION", icon = "🍀", info = "x2 Luck", multiplier = 2, seconds = 300, price = 6_000, color = rgb(120, 220, 255) },
+		{ id = "power", name = "POWER POTION", icon = "👊", info = "x2 Power", multiplier = 2, seconds = 300, price = 1_500, color = rgb(255, 196, 46) },
+		{ id = "money", name = "MONEY POTION", icon = "💰", info = "x2 Money", multiplier = 2, seconds = 300, price = 1_500, color = rgb(87, 255, 87) },
+		{ id = "luck", name = "LUCK POTION", icon = "🍀", info = "x2 Luck", multiplier = 2, seconds = 300, price = 2_500, color = rgb(120, 220, 255) },
 	},
 }
 Config.PotionById = {}
@@ -499,16 +545,16 @@ for _, info in Config.Potions.list do
 end
 
 -- Recompensa diária: uma por dia, em sequência. Faltou um dia, recomeça do primeiro.
-Config.Daily = { days = 7, rewards = { 300, 600, 1_200, 2_500, 5_000, 10_000, 25_000 } }
+Config.Daily = { days = 7, rewards = { 50, 100, 200, 400, 800, 1_500, 4_000 } }
 -- Recompensas por tempo jogado na sessão (minutos e o dinheiro de cada uma).
-Config.Playtime = { minutes = { 5, 10, 15, 30, 45, 60 }, rewards = { 150, 400, 800, 2_500, 5_000, 10_000 } }
+Config.Playtime = { minutes = { 5, 10, 15, 30, 45, 60 }, rewards = { 30, 80, 150, 400, 800, 1_500 } }
 
 -- Missões do dia: zeram à meia-noite (UTC). id também é o contador que o servidor soma.
 Config.Quests = {
-	{ id = "punch", text = "Land 400 punches", goal = 400, reward = 1_500 },
-	{ id = "walls", text = "Break 15 walls", goal = 15, reward = 2_500 },
-	{ id = "super", text = "Land 3 Super Punches", goal = 3, reward = 3_000 },
-	{ id = "collect", text = "Collect $3K from pedestals", goal = 3_000, reward = 2_000 },
+	{ id = "punch", text = "Land 400 punches", goal = 400, reward = 200 },
+	{ id = "walls", text = "Break 15 walls", goal = 15, reward = 350 },
+	{ id = "super", text = "Land 3 Super Punches", goal = 3, reward = 400 },
+	{ id = "collect", text = "Collect $500 from pedestals", goal = 500, reward = 300 },
 }
 Config.QuestById = {}
 for _, quest in Config.Quests do
@@ -538,20 +584,20 @@ Config.Friends = { perFriend = 0.1, max = 0.5 }
 --   extra  = "none", "snow" (flocos caindo), "bubbles" (gotas subindo), "pillars" (pilares
 --            de luz descendo do céu);  lightning = raios em volta do corpo
 Config.Auras = {
-	{ id = "ember", name = "EMBER", power = 1_000, multiplier = 1.03, color = rgb(255, 120, 20), followTier = true, flames = 0.75, orbit = "thin", rings = 1, spin = 0.85, ground = "none", shards = false, extra = "none" },
-	{ id = "spark", name = "SPARK", power = 5_000, multiplier = 1.06, color = rgb(255, 196, 30), accent = rgb(255, 240, 160), second = rgb(255, 120, 20), followTier = false, flames = 0.3, orbit = "ribbon", rings = 3, spin = 1, ground = "circle", shards = false, extra = "none" },
-	{ id = "frost", name = "FROST", power = 20_000, multiplier = 1.1, color = rgb(60, 140, 255), accent = rgb(215, 238, 255), second = rgb(140, 205, 255), followTier = false, flames = 1.25, orbit = "thin", rings = 2, spin = 0.7, ground = "circle", shards = true, extra = "snow" },
-	{ id = "venom", name = "VENOM", power = 80_000, multiplier = 1.15, color = rgb(90, 235, 60), accent = rgb(215, 255, 150), second = rgb(150, 60, 220), followTier = false, flames = 0.95, orbit = "thin", rings = 3, spin = 1.25, ground = "swirl", shards = false, extra = "bubbles" },
-	{ id = "storm", name = "STORM", power = 250_000, multiplier = 1.2, color = rgb(190, 150, 255), accent = rgb(255, 238, 252), second = rgb(255, 160, 225), followTier = false, flames = 0.3, orbit = "thin", rings = 2, spin = 1.4, ground = "swirl", shards = false, extra = "pillars", lightning = true },
-	{ id = "solar", name = "SOLAR", power = 800_000, multiplier = 1.3, color = rgb(255, 160, 20), accent = rgb(255, 232, 110), second = rgb(255, 70, 170), followTier = false, flames = 1.4, orbit = "thin", orbitColor = rgb(255, 40, 30), rings = 3, spin = 1.15, ground = "circle", shards = true, extra = "none" },
-	{ id = "void", name = "VOID", power = 2_000_000, multiplier = 1.4, color = rgb(245, 40, 170), accent = rgb(255, 160, 235), second = rgb(120, 40, 215), followTier = false, flames = 1.2, orbit = "slash", rings = 3, spin = 1, ground = "both", shards = true, extra = "none" },
+	{ id = "ember", name = "EMBER", power = 300, multiplier = 1.03, color = rgb(255, 120, 20), followTier = true, flames = 0.75, orbit = "thin", rings = 1, spin = 0.85, ground = "none", shards = false, extra = "none" },
+	{ id = "spark", name = "SPARK", power = 800, multiplier = 1.06, color = rgb(255, 196, 30), accent = rgb(255, 240, 160), second = rgb(255, 120, 20), followTier = false, flames = 0.3, orbit = "ribbon", rings = 3, spin = 1, ground = "circle", shards = false, extra = "none" },
+	{ id = "frost", name = "FROST", power = 2_000, multiplier = 1.1, color = rgb(60, 140, 255), accent = rgb(215, 238, 255), second = rgb(140, 205, 255), followTier = false, flames = 1.25, orbit = "thin", rings = 2, spin = 0.7, ground = "circle", shards = true, extra = "snow" },
+	{ id = "venom", name = "VENOM", power = 5_000, multiplier = 1.15, color = rgb(90, 235, 60), accent = rgb(215, 255, 150), second = rgb(150, 60, 220), followTier = false, flames = 0.95, orbit = "thin", rings = 3, spin = 1.25, ground = "swirl", shards = false, extra = "bubbles" },
+	{ id = "storm", name = "STORM", power = 10_000, multiplier = 1.2, color = rgb(190, 150, 255), accent = rgb(255, 238, 252), second = rgb(255, 160, 225), followTier = false, flames = 0.3, orbit = "thin", rings = 2, spin = 1.4, ground = "swirl", shards = false, extra = "pillars", lightning = true },
+	{ id = "solar", name = "SOLAR", power = 22_000, multiplier = 1.3, color = rgb(255, 160, 20), accent = rgb(255, 232, 110), second = rgb(255, 70, 170), followTier = false, flames = 1.4, orbit = "thin", orbitColor = rgb(255, 40, 30), rings = 3, spin = 1.15, ground = "circle", shards = true, extra = "none" },
+	{ id = "void", name = "VOID", power = 40_000, multiplier = 1.4, color = rgb(245, 40, 170), accent = rgb(255, 160, 235), second = rgb(120, 40, 215), followTier = false, flames = 1.2, orbit = "slash", rings = 3, spin = 1, ground = "both", shards = true, extra = "none" },
 }
 
 -- Força do efeito da aura no boneco: nasce fraca e cresce com o Poder, até ficar inteira.
 -- A escala é logarítmica: cada vez que o Poder multiplica, a aura dá o mesmo passo.
 Config.AuraFx = {
-	startPower = 1_000, -- Poder em que a aura tem a força mínima
-	fullPower = 2_500_000, -- Poder em que ela chega à força total (a última parede)
+	startPower = 300, -- Poder em que a aura tem a força mínima
+	fullPower = 50_000, -- Poder em que ela chega à força total (a última parede do mundo 1)
 	minStrength = 0.22, -- força com startPower (0 = nada, 1 = inteira)
 	spin = 3.2, -- giro do que orbita, em radianos por segundo (x o spin da aura e o do estilo)
 	boostSpin = 1.4, -- quanto a carga acelera o giro
@@ -559,6 +605,14 @@ Config.AuraFx = {
 	circleSize = 11, -- diâmetro do círculo do chão com a aura inteira, em studs
 	circleSpin = 16, -- giro do círculo, em graus por segundo
 	windPeriod = 1.3, -- segundos que cada onda de vento leva para abrir e sumir
+	-- voo: a aura escorre para o lado contrário ao movimento (parado = para cima)
+	flightSpeed = 45, -- studs/s em que ela deita de vez para trás
+	flightLift = 0.12, -- quanto ela ainda sobe mesmo deitada
+	flightFollow = 9, -- quão rápido a direção acompanha a mudança de movimento (maior = mais seco)
+	flightTailFollow = 3.5, -- o mesmo para a ponta do rastro: menor, e ela chicoteia nas curvas
+	flightTail = 15, -- comprimento do rastro, em studs, com a aura inteira e deitada
+	flightGap = 1.3, -- distância entre duas labaredas do rastro: menor = mais cheio (e mais partículas)
+	flightScroll = 2.2, -- quantas vezes por segundo a textura do rastro corre da frente até a ponta
 }
 
 Config.AuraById = {}
@@ -570,8 +624,8 @@ end
 -- dinheiro e depois equipa quando quiser. length = comprimento no jogo, em studs;
 -- lift = quanto o boneco sobe do chão em cima dela.
 Config.Mounts = {
-	{ id = "hoverboard", name = "HOVERBOARD", info = "Anti-gravity board", price = 10_000, length = 6.8, lift = 1.9, flip = true, color = rgb(60, 230, 255) },
-	{ id = "carpet", name = "MAGIC CARPET", info = "Flying carpet", price = 100_000, length = 7.6, lift = 1.7, flip = false, color = rgb(255, 120, 150) },
+	{ id = "hoverboard", name = "HOVERBOARD", info = "Anti-gravity board", price = 2_500, length = 6.8, lift = 1.9, flip = true, color = rgb(60, 230, 255) },
+	{ id = "carpet", name = "MAGIC CARPET", info = "Flying carpet", price = 20_000, length = 7.6, lift = 1.7, flip = false, color = rgb(255, 120, 150) },
 }
 Config.MountById = {}
 for _, info in Config.Mounts do

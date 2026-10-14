@@ -30,8 +30,7 @@ local function rootOf(player: Player): BasePart?
 end
 
 local function bagOf(player: Player): Vector3?
-	local plots = workspace:FindFirstChild("Plots")
-	local plot = plots and plots:FindFirstChild("Plot" .. tostring(player:GetAttribute("PlotId")))
+	local plot = Config.plotOf(player)
 	local gantry = plot and plot:FindFirstChild("Gantry")
 	local bag = gantry and gantry:FindFirstChild("Bag")
 	local center = bag and bag:GetAttribute("Center")

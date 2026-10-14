@@ -1,6 +1,10 @@
 --!strict
 -- Pedestais do terreno: liberar com dinheiro, colocar e recolher personagens, subir o nível
 -- deles, renda por segundo e coleta de tudo num botão só.
+--
+-- Cada jogador tem o mesmo terreno em todos os mundos. Os dados são um só (o perfil); tudo o
+-- que é mostrado (personagem no pedestal, preço, valor da coleta) é desenhado em todas as
+-- cópias, e o jogador mexe na do mundo em que está.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -14,6 +18,10 @@ local State = require(script.Parent.State)
 
 local P = Config.Palette
 local Pedestals = {}
+
+-- Fração de dinheiro que sobrou do último segundo de cada pedestal. Com rendas pequenas, um
+-- bônus de 15% sumiria no arredondamento; a sobra entra no segundo seguinte.
+local leftover: { [Player]: { [string]: number } } = {}
 
 local function pedestalOf(plot: Model, slot: number): Model?
 	local found = plot:FindFirstChild("Pedestal" .. slot)
@@ -29,13 +37,15 @@ local function total(profile: PlayerData.Profile): number
 	return sum
 end
 
--- Valor mostrado no botão de coleta do terreno.
+-- Valor mostrado no botão de coleta do terreno (em todas as cópias dele).
 local function setCashLabel(plot: Model, amount: number)
-	local pad = plot:FindFirstChild("Collect")
-	local gui = pad and pad:FindFirstChild("Gui")
-	local text = gui and gui:FindFirstChild("Amount")
-	if text and text:IsA("TextLabel") then
-		text.Text = "$" .. Format.abbreviate(amount)
+	for _, copy in State.copies(plot) do
+		local pad = copy:FindFirstChild("Collect")
+		local gui = pad and pad:FindFirstChild("Gui")
+		local text = gui and gui:FindFirstChild("Amount")
+		if text and text:IsA("TextLabel") then
+			text.Text = "$" .. Format.abbreviate(amount)
+		end
 	end
 end
 
@@ -61,7 +71,7 @@ end
 
 -- Mostra o estado do pedestal para o dono do terreno: trancado (com o preço no próximo a
 -- liberar), vazio ou com o personagem. Sem perfil (terreno sem dono), fica vazio e desligado.
-local function render(plot: Model, slot: number, profile: PlayerData.Profile?)
+local function renderOne(plot: Model, slot: number, profile: PlayerData.Profile?)
 	local pedestal = pedestalOf(plot, slot)
 	if not pedestal then
 		return
@@ -82,7 +92,8 @@ local function render(plot: Model, slot: number, profile: PlayerData.Profile?)
 	local nextToUnlock = profile ~= nil and slot == profile.slots + 1
 	local cost = Config.Plot.pedestals[slot].cost
 
-	rim.Color = if locked then P.red else P.cyan
+	local accent = plot:GetAttribute("Accent")
+	rim.Color = if locked then P.red elseif typeof(accent) == "Color3" then accent else P.cyan
 	lock.Enabled = locked
 	local price = lock:FindFirstChild("Price")
 	if price and price:IsA("TextLabel") then
@@ -121,6 +132,13 @@ local function render(plot: Model, slot: number, profile: PlayerData.Profile?)
 	board.Parent = model
 
 	model.Parent = pedestal
+end
+
+-- O mesmo pedestal em todas as cópias do terreno.
+local function render(plot: Model, slot: number, profile: PlayerData.Profile?)
+	for _, copy in State.copies(plot) do
+		renderOne(copy, slot, profile)
+	end
 end
 
 -- Recolhe de uma vez o dinheiro guardado em todos os pedestais. Devolve quanto pagou.
@@ -271,9 +289,10 @@ function Pedestals.attach(player: Player, plot: Model)
 	setCashLabel(plot, total(profile))
 end
 
+-- Só esta cópia: quem chama passa por todas (ver detach em init.server.luau).
 function Pedestals.detach(plot: Model)
 	for slot in Config.Plot.pedestals do
-		render(plot, slot, nil)
+		renderOne(plot, slot, nil)
 	end
 	setCashLabel(plot, 0)
 end
@@ -285,9 +304,14 @@ function Pedestals.tick()
 		local plot = State.plots[id]
 		if profile and next(profile.pedestals) then
 			local boost = Progress.moneyBoost(player, profile) -- rebirths e poção de dinheiro
+			local rest = leftover[player] or {}
+			leftover[player] = rest
 			PlayerData.update(player, function(p)
 				for key, entry in p.pedestals do
-					p.stored[key] = (p.stored[key] or 0) + math.floor(Config.fighterIncome(entry.id, levelOf(p, entry.id)) * boost)
+					local exact = Config.fighterIncome(entry.id, levelOf(p, entry.id)) * boost + (rest[key] or 0)
+					local whole = math.floor(exact)
+					rest[key] = exact - whole
+					p.stored[key] = (p.stored[key] or 0) + whole
 				end
 			end)
 			setCashLabel(plot, total(profile))
@@ -295,8 +319,8 @@ function Pedestals.tick()
 	end
 end
 
-function Pedestals.connect()
-	for id, plot in State.plots do
+local function connectPlot(id: number, plot: Model)
+	do
 		for slot in Config.Plot.pedestals do
 			local pedestal = pedestalOf(plot, slot)
 			if not pedestal then
@@ -324,6 +348,18 @@ function Pedestals.connect()
 			end
 		end)
 	end
+end
+
+function Pedestals.connect()
+	for _, plots in State.worldPlots do
+		for id, plot in plots do
+			connectPlot(id, plot)
+		end
+	end
+
+	Players.PlayerRemoving:Connect(function(player)
+		leftover[player] = nil
+	end)
 
 	State.remotes.Select.OnServerEvent:Connect(function(player, index)
 		local profile = PlayerData.get(player)

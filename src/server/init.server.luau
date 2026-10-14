@@ -56,8 +56,11 @@ for i = 1, Config.World.plotCount do
 	plot.Parent = plotsFolder
 	State.plots[i] = plot
 end
+State.worldPlots[1] = State.plots
+State.worldPlots[2] = Volcano.buildPlots() -- o mesmo terreno de cada jogador, no vulcão
 
 local lastHit: { [Player]: number } = {}
+local leftover: { [Player]: number } = {} -- fração de Poder que sobrou do último soco
 local lastTeleport: { [Player]: number } = {}
 
 type SuperStep = { key: string, zone: number, time: number }
@@ -67,17 +70,26 @@ local supers: { [Player]: SuperState } = {}
 -- automáticos ligados nesta sessão (o que está liberado fica no perfil)
 local autoOn: { [Player]: { [string]: boolean } } = {}
 
+-- As três funções abaixo valem para o terreno em todos os mundos: as cópias mostram o mesmo.
 local function setNameSign(plot: Model, text: string, color: Color3)
-	local sign = plot:FindFirstChild("NameSign")
-	local board = sign and sign:FindFirstChild("Board")
-	local textLabel = board and board:FindFirstChild("Text")
-	if textLabel and textLabel:IsA("TextLabel") then
-		textLabel.Text = text
-		textLabel.TextColor3 = color
+	for _, copy in State.copies(plot) do
+		local sign = copy:FindFirstChild("NameSign")
+		local board = sign and sign:FindFirstChild("Board")
+		local textLabel = board and board:FindFirstChild("Text")
+		if textLabel and textLabel:IsA("TextLabel") then
+			textLabel.Text = text
+			textLabel.TextColor3 = color
+		end
 	end
 end
 
-local function refreshBag(plot: Model, bagLevel: number)
+local function detachPlot(plot: Model)
+	for _, copy in State.copies(plot) do
+		Pedestals.detach(copy)
+	end
+end
+
+local function refreshBagOne(plot: Model, bagLevel: number)
 	local gantry = plot:FindFirstChild("Gantry")
 	local sign = gantry and gantry:FindFirstChild("Sign")
 	if not gantry or not sign then
@@ -104,6 +116,12 @@ local function refreshBag(plot: Model, bagLevel: number)
 	end
 	if prompt and prompt:IsA("ProximityPrompt") then
 		prompt.Enabled = nextLevel ~= nil
+	end
+end
+
+local function refreshBag(plot: Model, bagLevel: number)
+	for _, copy in State.copies(plot) do
+		refreshBagOne(copy, bagLevel)
 	end
 end
 
@@ -401,10 +419,11 @@ local function onPlayerRemoving(player: Player)
 		State.plotOf[player] = nil
 		setNameSign(State.plots[id], "Empty Plot", Color3.fromRGB(200, 200, 210))
 		refreshBag(State.plots[id], 1)
-		Pedestals.detach(State.plots[id])
+		detachPlot(State.plots[id])
 	end
 	Progress.leave(player)
 	lastHit[player] = nil
+	leftover[player] = nil
 	lastTeleport[player] = nil
 	supers[player] = nil
 	autoOn[player] = nil
@@ -458,7 +477,17 @@ local function tryHit(player: Player, forceCrit: boolean?): (number?, number?, b
 	if crit then
 		gain = math.floor(gain * (Config.Crit.baseMultiplier + (profile.stats.critDamage or 0) * Config.Stats.critDamage.perLevel))
 	end
-	gain = math.floor(gain * powerMultiplier(profile) * Progress.powerBoost(player, profile))
+	-- Com ganhos pequenos, um bônus de 6% sumiria no arredondamento. O que sobra de cada soco
+	-- fica guardado e entra no próximo: na média o jogador recebe o bônus inteiro. (Os testes,
+	-- que forçam o crítico, não usam a sobra: lá cada soco é arredondado sozinho.)
+	local exact = gain * powerMultiplier(profile) * Progress.powerBoost(player, profile)
+	if forceCrit == nil then
+		exact += leftover[player] or 0
+		gain = math.floor(exact)
+		leftover[player] = exact - gain
+	else
+		gain = math.floor(exact)
+	end
 	local tierBefore = RunMath.powerTier(profile.power)
 	PlayerData.update(player, function(p)
 		p.power += gain
@@ -478,6 +507,10 @@ local function buyStat(player: Player, name: any): boolean
 	end
 	local level = profile.stats[name] or 0
 	if level >= stat.max then
+		return false
+	end
+	if level >= Config.statCap(name, profile.rebirths) then
+		remotes.Fx:FireClient(player, "toast", `Unlock the {Config.Worlds[2].name} to train further!`)
 		return false
 	end
 	local cost = Config.statCost(name, level)
@@ -640,15 +673,17 @@ remotes.Super.OnServerEvent:Connect(function(player, token, success)
 	end
 end)
 
-for id, plot in State.plots do
-	local gantry = plot:FindFirstChild("Gantry") :: Instance
-	local upgrade = gantry:FindFirstChild("Upgrade") :: Instance
-	local prompt = upgrade:FindFirstChild("Prompt") :: ProximityPrompt
-	prompt.Triggered:Connect(function(player)
-		if State.owners[id] == player then
-			upgradeBag(player)
-		end
-	end)
+for _, plots in State.worldPlots do
+	for id, plot in plots do
+		local gantry = plot:FindFirstChild("Gantry") :: Instance
+		local upgrade = gantry:FindFirstChild("Upgrade") :: Instance
+		local prompt = upgrade:FindFirstChild("Prompt") :: ProximityPrompt
+		prompt.Triggered:Connect(function(player)
+			if State.owners[id] == player then
+				upgradeBag(player)
+			end
+		end)
+	end
 end
 
 remotes.Stat.OnServerEvent:Connect(buyStat)
@@ -772,9 +807,9 @@ local function travel(player: Player, id: any): boolean
 		end
 	end
 	player:SetAttribute("World", world.id)
-	local target = State.homeCFrame(player)
+	-- nos outros mundos chega-se pela praça da ilha; no gramado, pelo próprio terreno
+	local target = if world.id == 1 then State.homeCFrame(player) else State.arriveCFrame(world)
 	if not target then
-		player:SetAttribute("World", 1)
 		return false
 	end
 	-- o mapa é carregado por proximidade: pede o destino antes, senão o boneco chega sem chão
@@ -817,7 +852,9 @@ end
 -- Dá um de cada personagem (inventário e índice), todas as auras (pelo Poder), skills no
 -- máximo, dinheiro e Poder.
 -- Comando de admin (/giveall); também usado pelos testes.
-local GIVEALL_POWER = Config.Walls[#Config.Walls].power * 4 -- quebra a última parede até com carga mínima
+-- quebra a última parede do último mundo até com carga mínima
+local lastWalls = Config.Worlds[#Config.Worlds].walls
+local GIVEALL_POWER = lastWalls[#lastWalls].power * 4
 for _, aura in Config.Auras do
 	GIVEALL_POWER = math.max(GIVEALL_POWER, aura.power) -- e libera todas as auras
 end
@@ -909,9 +946,50 @@ local function resetPlayer(player: Player): boolean
 	return true
 end
 
+-- Jogador no servidor cujo nome (ou apelido) começa com `wanted`, sem diferenciar maiúsculas.
+local function findPlayer(wanted: string): Player?
+	local prefix = string.lower(wanted)
+	for _, other in Players:GetPlayers() do
+		if string.sub(string.lower(other.Name), 1, #prefix) == prefix or string.sub(string.lower(other.DisplayName), 1, #prefix) == prefix then
+			return other
+		end
+	end
+	return nil
+end
+
+-- Quantia escrita no chat: "5000", "2.5k", "10M", "3b", "1T".
+local GIVE_SUFFIX: { [string]: number } = { k = 1e3, m = 1e6, b = 1e9, t = 1e12 }
+local GIVE_MAX = 1e15
+local function parseAmount(text: string?): number?
+	local digits, suffix = string.match(string.lower(text or ""), "^([%d%.]+)([kmbt]?)$")
+	local value = tonumber(digits)
+	if not value then
+		return nil
+	end
+	local amount = math.floor(value * (GIVE_SUFFIX[suffix] or 1))
+	return if amount >= 1 and amount <= GIVE_MAX then amount else nil
+end
+
+-- /give: soma Poder ou dinheiro ao jogador. Devolve a mensagem, ou nil se o pedido não vale.
+local function give(target: Player, kind: string, amount: number): string?
+	local field = if kind == "power" then "power" elseif kind == "money" then "money" else nil
+	if not field or not PlayerData.get(target) then
+		return nil
+	end
+	PlayerData.update(target, function(p)
+		(p :: any)[field] = math.min((p :: any)[field] + amount, GIVE_MAX)
+	end)
+	if field == "power" then
+		grantFirstAura(target)
+		return `GIVE ({target.Name}): +{Format.abbreviate(amount)} Power!`
+	end
+	return `GIVE ({target.Name}): +${Format.abbreviate(amount)}!`
+end
+
 -- Comandos de chat de admin. Quem não é admin não recebe nada (nem aviso de que o comando
 -- existe). Sem nome, o comando vale para quem digitou; com um nome (ou o começo dele), vale
 -- para aquele jogador:  /giveall   /giveall fulano   /reset   /reset fulano
+--   /give power 5M   /give money 250k fulano   /give power 1b "fulano"
 local function adminCommand(name: string, alias: string, action: (admin: Player, target: Player) -> string)
 	local command = Instance.new("TextChatCommand")
 	command.Name = name
@@ -924,13 +1002,7 @@ local function adminCommand(name: string, alias: string, action: (admin: Player,
 		local target = admin
 		local wanted = string.lower(string.match(text, "^%S+%s+(%S+)") or "")
 		if wanted ~= "" then
-			local found: Player? = nil
-			for _, other in Players:GetPlayers() do
-				if string.sub(string.lower(other.Name), 1, #wanted) == wanted or string.sub(string.lower(other.DisplayName), 1, #wanted) == wanted then
-					found = other
-					break
-				end
-			end
+			local found = findPlayer(wanted)
 			if not found then
 				remotes.Fx:FireClient(admin, "toast", `No player called "{wanted}" here.`)
 				return
@@ -949,6 +1021,43 @@ adminCommand("GiveAll", "/giveall", function(_, target)
 	local count = giveAll(target)
 	return `GIVEALL ({target.Name}): {count} characters, all auras, max skills, money and power!`
 end)
+-- /give tem argumentos próprios (o quê, quanto e, se quiser, para quem), então não usa adminCommand.
+-- Devolve a mensagem para o admin e o jogador que recebeu (nil se nada foi dado).
+local function giveCommand(admin: Player, text: string): (string, Player?)
+	local kind, amountText, rest = string.match(text, "^%S+%s+(%a+)%s+(%S+)%s*(.*)$")
+	local amount = parseAmount(amountText)
+	kind = string.lower(kind or "")
+	if (kind ~= "power" and kind ~= "money") or not amount then
+		return "Usage: /give power|money <amount> [player]   e.g. /give power 5M", nil
+	end
+	local wanted = string.gsub(string.gsub(rest or "", '["\']', ""), "^%s*(.-)%s*$", "%1")
+	local target: Player? = admin
+	if wanted ~= "" then
+		target = findPlayer(wanted)
+		if not target then
+			return `No player called "{wanted}" here.`, nil
+		end
+	end
+	local message = give(target :: Player, kind, amount)
+	return message or `GIVE ({(target :: Player).Name}): no data loaded.`, if message then target else nil
+end
+do
+	local command = Instance.new("TextChatCommand")
+	command.Name = "Give"
+	command.PrimaryAlias = "/give"
+	command.Triggered:Connect(function(source, text)
+		local admin = Players:GetPlayerByUserId(source.UserId)
+		if not admin or not isAdmin(admin) then
+			return
+		end
+		local message, target = giveCommand(admin, text)
+		remotes.Fx:FireClient(admin, "toast", message)
+		if target and target ~= admin then
+			remotes.Fx:FireClient(target, "toast", message)
+		end
+	end)
+	command.Parent = game:GetService("TextChatService")
+end
 adminCommand("Reset", "/reset", function(_, target)
 	return if resetPlayer(target) then `RESET ({target.Name}): everything back to zero.` else `RESET ({target.Name}): no data loaded.`
 end)
@@ -1042,6 +1151,8 @@ if RunService:IsStudio() then
 			return sellCharacter(player, value)
 		elseif command == "reset" then
 			return resetPlayer(player)
+		elseif command == "giveCommand" then
+			return (giveCommand(player, value))
 		elseif command == "isAdmin" then
 			return isAdmin(player)
 		elseif command == "giveAll" then

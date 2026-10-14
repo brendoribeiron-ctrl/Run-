@@ -6,7 +6,8 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Config = require(ReplicatedStorage.Shared.Config)
 
 local State = {
-	plots = {} :: { Model },
+	plots = {} :: { Model }, -- os terrenos do mundo 1
+	worldPlots = {} :: { [number]: { Model } }, -- por mundo: worldPlots[mundo][id]; o [1] é `plots`
 	owners = {} :: { [number]: Player },
 	plotOf = {} :: { [Player]: number },
 	remotes = {} :: { [string]: RemoteEvent },
@@ -24,9 +25,29 @@ function State.createRemotes(names: { string })
 	folder.Parent = ReplicatedStorage
 end
 
+-- O terreno do jogador no mundo em que ele está.
 function State.plot(player: Player): Model?
 	local id = State.plotOf[player]
-	return if id then State.plots[id] else nil
+	if not id then
+		return nil
+	end
+	local here = State.worldPlots[Config.worldOf(player).id]
+	return (here and here[id]) or State.plots[id]
+end
+
+-- O mesmo terreno em todos os mundos (as cópias mostram sempre a mesma coisa).
+function State.copies(plot: Model): { Model }
+	local id = plot:GetAttribute("PlotId")
+	local list = {}
+	for _, plots in State.worldPlots do
+		if plots[id] then
+			table.insert(list, plots[id])
+		end
+	end
+	if #list == 0 then
+		table.insert(list, plot)
+	end
+	return list
 end
 
 function State.root(player: Player): BasePart?
@@ -58,15 +79,15 @@ function State.arriveCFrame(world: any): CFrame
 	return CFrame.lookAt(at, at + Vector3.new(0, 0, -1))
 end
 
--- Para onde o jogador volta depois da corrida ou de cair: o terreno dele no mundo 1, a ilha de
--- chegada nos outros.
+-- Para onde o jogador volta quando cai do mapa: o terreno dele no mundo em que está.
 function State.homeCFrame(player: Player): CFrame?
-	local world = Config.worldOf(player)
-	if world.id ~= 1 then
-		return State.arriveCFrame(world)
-	end
 	local plot = State.plot(player)
 	return if plot then State.spawnCFrame(plot) else nil
+end
+
+-- Ponto de largada da zona de carga do mundo em que o jogador está, de frente para a pista.
+function State.zoneCFrame(player: Player): CFrame
+	return CFrame.new(Config.zoneCenter(Config.worldOf(player)) + Config.Run.teleportOffset)
 end
 
 return State
