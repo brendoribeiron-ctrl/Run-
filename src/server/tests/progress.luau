@@ -70,7 +70,7 @@ check("poção dobra o soco", hook:Invoke("hit", player, "noCrit") == base * pot
 local first = state().boosts.power
 go("potion", "power")
 check("comprar de novo soma tempo", math.abs(state().boosts.power - first - potion.seconds) < 2, tostring(state().boosts.power - first))
-check("janela mostra a poção ativa", string.find(open("Shop").potion, "ACTIVE", 1, true) ~= nil, "texto")
+check("janela mostra a poção ativa", string.find(open("Potions").potion, "ACTIVE", 1, true) ~= nil, "texto")
 hook:Invoke("set", player, { money = 1e9, boosts = { power = workspace:GetServerTimeNow() + Config.Potions.maxSeconds } })
 check("poção cheia recusa", go("potion", "power") == false and state().money == 1e9, "cobrou")
 hook:Invoke("set", player, { boosts = { power = workspace:GetServerTimeNow() - 5 }, money = 0 })

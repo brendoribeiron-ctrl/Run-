@@ -610,7 +610,7 @@ local function boostEnds(): { [string]: number }
 end
 
 local function refreshShop()
-	if not Windows.isOpen("Shop") then
+	if not Windows.isOpen("Potions") then
 		return
 	end
 	local ends = boostEnds()
@@ -624,9 +624,36 @@ local function refreshShop()
 	end
 end
 
+-- Painel SHOP do HUD: passes de jogo (Config.Shop). As poções ficam na casa de feitiçaria.
+local function buildPasses()
+	local window = Windows.create("Shop", "SHOP", Vector2.new(640, 400), P.red, nil)
+	Ui.text(window, { name = "Help", text = "Potions are sold at the counter inside the Witch House.", color = MUTED, size = UDim2.new(1, -40, 0, 22), position = UDim2.fromOffset(20, 46), textSize = 16, stroke = 2 })
+	local grid = gridArea(window, 76, 18, Vector2.new(188, 280))
+	for order, info in Config.Shop do
+		local passId: number = if info.auto then Config.Auto[info.auto].passId else info.passId
+		local frame = card(grid, info.id, order)
+		Ui.text(frame, { name = "Icon", text = info.icon, size = UDim2.fromOffset(80, 80), position = UDim2.new(0.5, 0, 0, 12), anchor = Vector2.new(0.5, 0), stroke = 3 })
+		fitted(frame, "Name", info.name, 98, 28, 22, info.color)
+		fitted(frame, "Info", info.info, 128, 26, 22, Ui.white)
+		fitted(frame, "Kind", "GAME PASS", 160, 26, 20, MUTED)
+		local box = Ui.frame(frame, "Price", UDim2.new(1, -24, 0, 44), UDim2.new(0, 12, 1, -56), if passId > 0 then GREEN else EMPTY)
+		Ui.corner(box, 12)
+		Ui.border(box, 3)
+		Ui.text(box, { name = "Label", text = if passId > 0 then "BUY" else "SOON", size = UDim2.fromScale(1, 1), textSize = 22, stroke = 3 })
+		local button = Ui.hit(frame, "Hit")
+		Ui.juice(button, frame)
+		button.Activated:Connect(function()
+			if passId > 0 then
+				game:GetService("MarketplaceService"):PromptGamePassPurchase(player, passId)
+			end
+		end)
+	end
+end
+
+-- Balcão de poções da casa de feitiçaria: abre pelo aviso do balcão, não pelo HUD.
 local function buildShop()
 	local remote = remotes:WaitForChild("Potion") :: RemoteEvent
-	local window = Windows.create("Shop", "POTION SHOP", Vector2.new(640, 400), P.red, refreshShop)
+	local window = Windows.create("Potions", "POTION SHOP", Vector2.new(640, 400), P.red, refreshShop)
 	Ui.text(window, { name = "Help", text = "Potions boost you for a while. Buying again adds more time.", color = MUTED, size = UDim2.new(1, -40, 0, 22), position = UDim2.fromOffset(20, 46), textSize = 16, stroke = 2 })
 	local grid = gridArea(window, 76, 18, Vector2.new(188, 280))
 	for order, info in Config.Potions.list do
@@ -866,7 +893,7 @@ local function buildPlaytime()
 	task.spawn(function()
 		while true do
 			refreshPlaytime()
-			if Windows.isOpen("Shop") then
+			if Windows.isOpen("Potions") then
 				refreshShop()
 			end
 			task.wait(1)
@@ -1022,7 +1049,7 @@ local function testHook()
 			rebirth = if Windows.isOpen("Rebirth") then rebirthLabels.need.Text else "",
 			daily = if Windows.isOpen("Daily") then dailyButton.Text else "",
 			quest = if Windows.isOpen("Daily") then questRows[1].button.Text .. " " .. questRows[1].progress.Text else "",
-			potion = if Windows.isOpen("Shop") then potionCards.power.status.Text else "",
+			potion = if Windows.isOpen("Potions") then potionCards.power.status.Text else "",
 			playtime = if playtimeCards[1] then playtimeCards[1].status.Text else "",
 			indexCards = #Config.Characters,
 			indexFound = visible,
@@ -1038,6 +1065,7 @@ function Menus.start()
 	buildRank()
 	buildIndex()
 	buildShop()
+	buildPasses()
 	buildRebirth()
 	buildDaily()
 	buildPlaytime()
@@ -1050,8 +1078,8 @@ function Menus.start()
 	end
 	-- balcão de poções da casa de feitiçaria
 	game:GetService("ProximityPromptService").PromptTriggered:Connect(function(prompt)
-		if prompt.Name == "PotionShop" and not Windows.isOpen("Shop") then
-			Windows.toggle("Shop")
+		if prompt.Name == "PotionShop" and not Windows.isOpen("Potions") then
+			Windows.toggle("Potions")
 		end
 	end)
 	UserInputService.InputBegan:Connect(function(input, processed)

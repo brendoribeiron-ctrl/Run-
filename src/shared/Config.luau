@@ -510,23 +510,25 @@ Config.Move = {
 
 -- Rebirth: ao alcançar o Poder exigido, o jogador zera Poder, dinheiro e saco e ganha um
 -- multiplicador permanente. Personagens, pedestais, níveis, skills e montarias ficam.
--- É um por mundo: o rebirth N pede a última parede do mundo N e abre o mundo N + 1.
+-- O 1º pede a última parede do mundo 1 e abre o vulcão; os seguintes seguem a lista de costs e,
+-- acabada a lista, continuam no mesmo passo (100M, 200M, 500M, 1B...).
 Config.Rebirth = {
 	max = 25,
 	powerPerRebirth = 0.5, -- cada rebirth soma este tanto ao ganho de Poder (2 rebirths = 2x)
 	moneyPerRebirth = 0.25, -- e este tanto à renda dos pedestais
 	rewardPerRebirth = 0.5, -- e às recompensas (diária, tempo de jogo, missões)
-	costGrowth = 1.5, -- depois do último mundo, cada rebirth pede este tanto a mais que o anterior
+	costs = { 50_000, 250_000, 500_000, 1_000_000, 2_000_000, 5_000_000, 10_000_000, 20_000_000, 50_000_000 },
 }
 
 -- Poder exigido para o próximo rebirth de quem já fez `rebirths`.
 function Config.rebirthCost(rebirths: number): number
-	local world = Config.Worlds[rebirths + 1]
-	if world then
-		return world.walls[#world.walls].power
+	local costs = Config.Rebirth.costs
+	local cost = costs[math.min(rebirths + 1, #costs)]
+	-- depois da lista: x2, x2, x2,5 e repete (1, 2, 5, 10, 20, 50...)
+	for step = 1, rebirths + 1 - #costs do
+		cost *= if step % 3 == 0 then 2.5 else 2
 	end
-	local last = Config.Worlds[#Config.Worlds]
-	return math.floor(last.walls[#last.walls].power * Config.Rebirth.costGrowth ^ (rebirths - #Config.Worlds + 1))
+	return cost
 end
 
 -- Poções da loja (painel SHOP e balcão da casa de feitiçaria): bônus com tempo, comprado com
@@ -545,6 +547,14 @@ for _, info in Config.Potions.list do
 end
 
 -- Recompensa diária: uma por dia, em sequência. Faltou um dia, recomeça do primeiro.
+-- Painel SHOP do HUD: só o que se compra com Robux. passId 0 = passe ainda não criado. Os
+-- automáticos usam o passId de Config.Auto. As poções ficam só no balcão da casa de feitiçaria.
+Config.Shop = {
+	{ id = "vip", name = "VIP", icon = "👑", info = "VIP perks", color = rgb(255, 200, 60), passId = 0 },
+	{ id = "punch", name = "AUTO CLICK", icon = "👊", info = "Punches for you", color = rgb(90, 200, 255), auto = "punch" },
+	{ id = "super", name = "AUTO SUPER", icon = "⚡", info = "Never miss a Super", color = rgb(255, 120, 220), auto = "super" },
+}
+
 Config.Daily = { days = 7, rewards = { 50, 100, 200, 400, 800, 1_500, 4_000 } }
 -- Recompensas por tempo jogado na sessão (minutos e o dinheiro de cada uma).
 Config.Playtime = { minutes = { 5, 10, 15, 30, 45, 60 }, rewards = { 30, 80, 150, 400, 800, 1_500 } }

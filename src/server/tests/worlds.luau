@@ -121,12 +121,13 @@ hook:Invoke("runFinish", player)
 task.wait(0.4)
 check("depois da corrida volta para a zona do vulcão", player:GetAttribute("World") == 2 and (where() - (zone + Config.Run.teleportOffset)).Magnitude < 8, tostring(where()))
 check("o personagem entra na mochila", state().inventory[1] == id, tostring(state().inventory[1]))
--- um rebirth por mundo: o 1º pede a última parede do gramado (50K) e abre o vulcão; o 2º pede
--- a última do vulcão. As primeiras paredes daqui ficam abaixo do fim do mundo 1, porque o
+-- o 1º rebirth pede a última parede do gramado (50K) e abre o vulcão; os seguintes seguem a
+-- lista (250K, 500K, 1M...). As primeiras paredes daqui ficam abaixo do fim do mundo 1, porque o
 -- jogador chega do rebirth com o Poder zerado.
 local lava = world.walls
 check("um rebirth aos 50K abre o vulcão", world.rebirths == 1 and Config.rebirthCost(0) == 50_000 and Config.Walls[#Config.Walls].power == 50_000, tostring(Config.rebirthCost(0)))
-check("o 2º rebirth pede o fim do vulcão", Config.rebirthCost(1) == lava[#lava].power and Config.rebirthCost(2) > Config.rebirthCost(1), tostring(Config.rebirthCost(1)))
+check("os rebirths seguintes pedem 250K, 500K, 1M", Config.rebirthCost(1) == 250_000 and Config.rebirthCost(2) == 500_000 and Config.rebirthCost(3) == 1_000_000, tostring(Config.rebirthCost(1)))
+check("depois da lista o custo segue 1, 2, 5", Config.rebirthCost(8) == 50_000_000 and Config.rebirthCost(9) == 100_000_000 and Config.rebirthCost(11) == 500_000_000 and Config.rebirthCost(12) == 1_000_000_000, tostring(Config.rebirthCost(11)))
 check("o vulcão começa abaixo do fim do mundo 1 e vai além", lava[1].power < 50_000 and lava[#lava].power > 50_000, tostring(lava[1].power))
 hook:Invoke("goZone", player, "resetCooldown")
 task.wait(0.3)

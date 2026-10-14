@@ -26,12 +26,14 @@ local NAVY = Color3.fromRGB(12, 30, 78)
 
 local Windows = {}
 
-type Entry = { frame: Frame, open: boolean, refresh: (() -> ())? }
+type Entry = { frame: Frame, open: boolean, refresh: (() -> ())?, wide: number }
 
 local entries: { [string]: Entry } = {}
 local listeners: { () -> () } = {}
 
 local stage: Part
+local surface: SurfaceGui
+local stretch = 1 -- largura do painel para a janela aberta, em vezes a de Config.Panel
 local canvas: Frame
 local flash: Frame
 local light: PointLight
@@ -97,7 +99,7 @@ local function ensureStage()
 	light.Brightness = 0
 	light.Parent = stage
 
-	local surface = Instance.new("SurfaceGui")
+	surface = Instance.new("SurfaceGui")
 	surface.Name = "Menus"
 	surface.ResetOnSpawn = false
 	surface.Adornee = stage
@@ -175,7 +177,9 @@ local function skin(frame: Frame, name: string, title: string, accent: Color3)
 end
 
 -- Cria a janela fechada e devolve a moldura para o conteúdo. refresh roda toda vez que ela abre.
-function Windows.create(name: string, title: string, size: Vector2, accent: Color3, refresh: (() -> ())?): Frame
+-- wide: para uma janela mais larga que o painel padrão (1.35 = 35% mais larga); o painel cresce
+-- para a direita, longe do boneco.
+function Windows.create(name: string, title: string, size: Vector2, accent: Color3, refresh: (() -> ())?, wide: number?): Frame
 	ensureStage()
 	local frame = Ui.frame(canvas, name, UDim2.fromOffset(size.X, size.Y), UDim2.fromScale(0.5, 0.5), nil, Vector2.new(0.5, 0.5))
 	frame.BackgroundTransparency = 0
@@ -184,9 +188,9 @@ function Windows.create(name: string, title: string, size: Vector2, accent: Colo
 	-- cada janela enche o painel, seja qual for o tamanho em que foi desenhada
 	local fit = Instance.new("UIScale")
 	fit.Name = "Fit"
-	fit.Scale = math.min((PANEL.canvas.X - PANEL.margin) / size.X, (PANEL.canvas.Y - PANEL.margin) / size.Y)
+	fit.Scale = math.min((PANEL.canvas.X * (wide or 1) - PANEL.margin) / size.X, (PANEL.canvas.Y - PANEL.margin) / size.Y)
 	fit.Parent = frame
-	entries[name] = { frame = frame, open = false, refresh = refresh }
+	entries[name] = { frame = frame, open = false, refresh = refresh, wide = wide or 1 }
 	return frame
 end
 
@@ -208,7 +212,7 @@ end
 -- Posiciona painel e câmera a partir de onde o boneco está agora.
 local function place(root: BasePart)
 	local frame = CFrame.new(root.Position) * (root.CFrame - root.Position)
-	local position = frame:PointToWorldSpace(PANEL.offset)
+	local position = frame:PointToWorldSpace(PANEL.offset + Vector3.new((stretch - 1) * PANEL.size.X / 2, 0, 0))
 	local eye = frame:PointToWorldSpace(PANEL.cameraOffset)
 	base = CFrame.lookAt(position, frame:PointToWorldSpace(PANEL.facing))
 	cameraGoal = CFrame.lookAt(eye, frame:PointToWorldSpace(PANEL.lookAt))
@@ -242,6 +246,13 @@ function Windows.set(name: string, open: boolean)
 	entry.open = true
 	if entry.refresh then
 		entry.refresh()
+	end
+	if stretch ~= entry.wide then
+		stretch = entry.wide
+		surface.CanvasSize = Vector2.new(PANEL.canvas.X * stretch, PANEL.canvas.Y)
+		if holding then
+			place(root)
+		end
 	end
 	if not holding then
 		holding = true
@@ -346,7 +357,7 @@ local function step(dt: number)
 	if math.abs(facing) > 1e-4 then
 		hit = ray.Origin + ray.Direction * ((base.Position - ray.Origin):Dot(normal) / facing)
 		local point = base:PointToObjectSpace(hit)
-		local nx, ny = point.X / (PANEL.size.X / 2), point.Y / (PANEL.size.Y / 2)
+		local nx, ny = point.X / (PANEL.size.X * stretch / 2), point.Y / (PANEL.size.Y / 2)
 		over = math.abs(nx) <= 1.05 and math.abs(ny) <= 1.05
 		if over then
 			goal = Vector2.new(math.clamp(nx, -1, 1), math.clamp(ny, -1, 1))
@@ -356,7 +367,7 @@ local function step(dt: number)
 
 	-- abre de uma lâmina fina, ainda virada de lado, até o tamanho cheio
 	local grow = 0.04 + 0.96 * eased
-	stage.Size = Vector3.new(PANEL.size.X * grow, PANEL.size.Y * (0.25 + 0.75 * eased), 0.05)
+	stage.Size = Vector3.new(PANEL.size.X * stretch * grow, PANEL.size.Y * (0.25 + 0.75 * eased), 0.05)
 	stage.CFrame = base
 		* CFrame.Angles(math.rad(tilt.Y * PANEL.maxTilt), math.rad(-tilt.X * PANEL.maxTilt), 0)
 		* CFrame.Angles(0, math.rad(PANEL.openTwist) * (1 - eased), math.rad(-8) * (1 - eased))

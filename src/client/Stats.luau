@@ -34,7 +34,7 @@ local LAYOUT = { { 0, 0 }, { 0, 1 }, { 0, 2 }, { -1, 3 }, { 1, 3 }, { 0, 4 }, { 
 local EDGES = { { 1, 2 }, { 2, 3 }, { 3, 4 }, { 3, 5 }, { 4, 6 }, { 5, 6 }, { 6, 7 }, { 7, 8 }, { 7, 9 }, { 8, 10 }, { 9, 10 } }
 local KEYSTONE = { [6] = true, [10] = true } -- nós maiores, no fecho de cada losango
 local TREE = Vector2.new(438, 440) -- tamanho do desenho da árvore, antes do zoom
-local VIEW = Vector2.new(416, 440) -- janela por onde se vê a árvore
+local VIEW = Vector2.new(674, 440) -- janela por onde se vê a árvore
 local ZOOM = 1.8 -- quanto o desenho é ampliado dentro da janela
 local DRAG = 1.5 -- pixels do desenho por pixel de tela ao arrastar
 local WHEEL = 70 -- pixels por passo da roda do mouse
@@ -221,7 +221,7 @@ function Stats.focus(name: string)
 end
 
 local function build(remote: RemoteEvent)
-	local window = Windows.create("Skills", "SKILL TREE", Vector2.new(660, 500), P.cyan, refresh)
+	local window = Windows.create("Skills", "SKILL TREE", Vector2.new(918, 500), P.cyan, refresh, 1.35)
 
 	local view = Ui.frame(window, "Tree", UDim2.fromOffset(VIEW.X, VIEW.Y), UDim2.fromOffset(230, 46), Color3.fromRGB(8, 13, 34))
 	view.ClipsDescendants = true

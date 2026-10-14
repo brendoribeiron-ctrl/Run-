@@ -17,7 +17,8 @@ for _, info in Config.Characters do
 	assert(table.find(state.inventory, info.id), "faltou " .. info.id)
 	assert(state.index[info.id] == true, "índice sem " .. info.id)
 end
-assert(state.power >= 10_000_000, "poder não foi ao máximo: " .. tostring(state.power))
+local lastWalls = Config.Worlds[#Config.Worlds].walls
+assert(state.power >= lastWalls[#lastWalls].power * 4, "poder não foi ao máximo: " .. tostring(state.power))
 for _, aura in Config.Auras do
 	assert(state.power >= aura.power, "aura trancada: " .. aura.id)
 	assert(hook:Invoke("auraEquip", player, aura.id) == true, "não equipou " .. aura.id)

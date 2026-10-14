@@ -704,7 +704,15 @@ local function rebirth(player: Player): boolean
 	return true
 end
 remotes.Rebirth.OnServerEvent:Connect(rebirth)
-remotes.Potion.OnServerEvent:Connect(Progress.buyPotion)
+-- as poções só são vendidas no balcão da casa de feitiçaria: longe dele o pedido não vale
+remotes.Potion.OnServerEvent:Connect(function(player, id)
+	local sanctum = workspace:FindFirstChild("Sanctum")
+	local counter = sanctum and sanctum:FindFirstChild("ShopBody", true)
+	local character = player.Character
+	if counter and counter:IsA("BasePart") and character and (character:GetPivot().Position - counter.Position).Magnitude <= Config.Sanctum.shopRange * 3 then
+		Progress.buyPotion(player, id)
+	end
+end)
 remotes.Daily.OnServerEvent:Connect(Progress.claimDaily)
 remotes.Playtime.OnServerEvent:Connect(Progress.claimPlaytime)
 remotes.Quest.OnServerEvent:Connect(Progress.claimQuest)
