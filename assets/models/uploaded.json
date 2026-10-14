@@ -94,5 +94,9 @@
 	"volcano_terrace": {
 		"assetId": "86974312399773",
 		"hash": "e8d0e1966a6426935ea087d9b4a01a371d459d31"
+	},
+	"boss_room": {
+		"assetId": "130443178701671",
+		"hash": "8590ba1916753f8f960ec1d97c53e8f3063df18a"
 	}
 }

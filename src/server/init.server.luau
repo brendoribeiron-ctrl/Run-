@@ -19,6 +19,7 @@ local Mounts = require(script.Mounts)
 local Sanctum = require(script.Sanctum)
 local Scenery = require(script.Scenery)
 local State = require(script.State)
+local BossRoom = require(script.BossRoom)
 local Volcano = require(script.Volcano)
 local Wizard = require(script.Wizard)
 local World = require(script.World)
@@ -31,7 +32,7 @@ local World = require(script.World)
 -- Super: S->C "start", senha, teclas | "result", acertou, ganho | "auto", ganho      C->S senha, acertou
 -- Auto: C->S "buy", nome | "toggle", nome, ligado
 -- Aura: C->S id da aura a equipar          Slot: C->S posição na mochila, slot rápido de destino
-State.createRemotes({ "BagHit", "Charge", "RunResult", "Select", "Fx", "Stat", "GoZone", "Super", "Auto", "Aura", "Slot", "Mount", "Cast", "Sell", "Rebirth", "Potion", "Daily", "Playtime", "Quest", "Fuse", "World" })
+State.createRemotes({ "BagHit", "Charge", "RunResult", "Select", "Fx", "Stat", "GoZone", "Super", "Auto", "Aura", "Slot", "Mount", "Cast", "Sell", "Rebirth", "Potion", "Daily", "Playtime", "Quest", "Fuse", "World", "BossReward" })
 local remotes = State.remotes
 
 World.setupLighting()
@@ -45,6 +46,9 @@ task.spawn(function()
 	end
 end)
 task.spawn(Volcano.build)
+BossRoom.rewarder = Run.reward
+BossRoom.build()
+BossRoom.connect()
 task.spawn(Mounts.build)
 task.spawn(Scenery.build)
 
@@ -788,6 +792,7 @@ local function goZone(player: Player): boolean
 		return false
 	end
 	lastTeleport[player] = now
+	player:SetAttribute("Room", nil)
 	character:PivotTo(CFrame.new(Config.zoneCenter(State.world(player)) + Config.Run.teleportOffset))
 	return true
 end
@@ -815,6 +820,7 @@ local function travel(player: Player, id: any): boolean
 		end
 	end
 	player:SetAttribute("World", world.id)
+	player:SetAttribute("Room", nil)
 	-- nos outros mundos chega-se pela praça da ilha; no gramado, pelo próprio terreno
 	local target = if world.id == 1 then State.homeCFrame(player) else State.arriveCFrame(world)
 	if not target then
@@ -1111,6 +1117,10 @@ if RunService:IsStudio() then
 			return Run.rollCharacter(value)
 		elseif command == "travel" then
 			return travel(player, value)
+		elseif command == "leaveRoom" then
+			return BossRoom.leave(player)
+		elseif command == "bossWin" then
+			return BossRoom.victory(player)
 		elseif command == "wizard" then
 			return Wizard.position()
 		elseif command == "pedestal" then

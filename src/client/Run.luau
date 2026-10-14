@@ -13,6 +13,7 @@ local Config = require(ReplicatedStorage.Shared.Config)
 local Format = require(ReplicatedStorage.Shared.Format)
 local RunMath = require(ReplicatedStorage.Shared.RunMath)
 local Aura = require(script.Parent.Aura)
+local BossRoom = require(script.Parent.BossRoom)
 local Fx = require(script.Parent.Fx)
 local Hud = require(script.Parent.Hud)
 local Pose = require(script.Parent.Pose)
@@ -682,6 +683,17 @@ local function playRun(result: any)
 	Pose.weight("smashL", 0, true)
 	local impact = root.Position + Vector3.new(0, 2, -4)
 	local failed = broken < #walls
+	if not failed then
+		-- corredor limpo: um portal leva à sala do chefe (BossRoom.luau encena a passagem)
+		Fx.title("HALLWAY CLEARED!", P.yellowLine, 1)
+		distanceBar.Visible = false
+		popup.Visible = false
+		BossRoom.enter(root, humanoid, place)
+		restoreWalls()
+		state = "idle"
+		-- o sorteio vem depois da luta com o chefe (o servidor manda pelo BossReward)
+		return
+	end
 	if failed then
 		local color = tierColor(walls[broken + 1].tier)
 		Fx.burst(impact, Ui.white, 34, 0.45)

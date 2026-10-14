@@ -313,8 +313,27 @@ Config.Wizard = {
 	travelRange = 40, -- o servidor só aceita a viagem com o jogador até esta distância dele
 }
 
+-- Sala do chefe (src/server/BossRoom.luau; modelo em tools/blender/boss_room.py): a rotunda
+-- para onde vai quem limpa o corredor inteiro. Cada mundo tem a sua, em center + offset do
+-- mundo: longe e no alto, fora do alcance de quem está no mapa. As medidas abaixo são as do
+-- modelo; no jogo tudo é multiplicado por scale.
+Config.BossRoom = {
+	center = Vector3.new(0, 1200, -700), -- centro do piso
+	scale = 2, -- tamanho da sala no jogo, em vezes o do modelo do Blender
+	radius = 64, -- até a face de dentro da parede
+	wallHeight = 60,
+	pillarRing = 52, -- raio do anel de pilares
+	entry = 54, -- distância do centro até onde o jogador aparece, perto da porta (+Z)
+	exitRange = 16, -- distância da porta para o aviso de sair aparecer (já em studs do jogo)
+	challengeRange = 30, -- distância do círculo para o aviso de desafiar aparecer (studs do jogo)
+	names = { "ARCANE THRONE", "MAGMA THRONE" },
+	-- cinemática de entrada (cliente)
+	portalTime = 1.7, -- segundos entre o fim do corredor e o clarão do portal (agacha, salta, mergulha)
+	introTime = 5.2, -- segundos da cinemática dentro da sala
+}
+
 -- Modelos de Shared.Assets que não são cenário espalhado (cada um tem o próprio módulo).
-Config.StructureAssets = { sanctum = true, potion_shop = true, wizard = true, volcano_terrace = true, volcano_base = true, volcano_track = true, volcano_mount = true, volcano_spire = true }
+Config.StructureAssets = { boss_room = true, sanctum = true, potion_shop = true, wizard = true, volcano_terrace = true, volcano_base = true, volcano_track = true, volcano_mount = true, volcano_spire = true }
 
 -- Sorteio: pesos em relação ao tier da última parede quebrada.
 Config.Roll = {

@@ -22,6 +22,7 @@ local Move = require(script.Parent.Move)
 local Pose = require(script.Parent.Pose)
 local Run = require(script.Parent.Run)
 local Stats = require(script.Parent.Stats)
+local BossRoomClient = require(script.Parent.BossRoom)
 local Super = require(script.Parent.Super)
 local Ui = require(script.Parent.Ui)
 local Windows = require(script.Parent.Windows)
@@ -920,6 +921,8 @@ local function testHook()
 			return Worlds.debug()
 		elseif command == "toggle" then
 			Windows.toggle(arg)
+		elseif command == "bossState" then
+			return BossRoomClient.debug()
 		elseif command == "skillsFocus" then
 			Stats.focus(arg)
 			return true

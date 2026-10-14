@@ -6,6 +6,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Config = require(ReplicatedStorage.Shared.Config)
 local RunMath = require(ReplicatedStorage.Shared.RunMath)
+local BossRoom = require(script.Parent.BossRoom)
 local PlayerData = require(script.Parent.PlayerData)
 local Progress = require(script.Parent.Progress)
 local State = require(script.Parent.State)
@@ -16,6 +17,7 @@ type Session = {
 	chargeStart: number,
 	running: boolean,
 	reward: string?,
+	cleared: boolean?, -- quebrou todas as paredes: vai para a sala do chefe
 }
 
 export type Result = {
@@ -120,6 +122,7 @@ local function grant(player: Player, characterId: string)
 end
 
 -- Fim da corrida: entrega a recompensa e devolve o jogador à zona de carga, pronto para outra.
+-- Quem limpou o corredor inteiro vai para a sala do chefe.
 function Run.finish(player: Player)
 	local session = sessions[player]
 	if not session then
@@ -138,8 +141,26 @@ function Run.finish(player: Player)
 			root.AssemblyLinearVelocity = Vector3.zero
 			root.AssemblyAngularVelocity = Vector3.zero
 		end
-		character:PivotTo(State.zoneCFrame(player))
+		if session.cleared then
+			BossRoom.setPending(player, true)
+			BossRoom.enter(player)
+		else
+			character:PivotTo(State.zoneCFrame(player))
+		end
 	end
+end
+
+-- Sorteio da vitória contra o chefe: o personagem vem da última parede do mundo do jogador.
+function Run.reward(player: Player): (string?, boolean)
+	local profile = PlayerData.get(player)
+	if not profile then
+		return nil, false
+	end
+	local world = State.world(player)
+	local characterId = Run.rollCharacter(#world.walls, Progress.luckBoost(player, profile), world)
+	local isNew = profile.index[characterId] ~= true
+	grant(player, characterId)
+	return characterId, isNew
 end
 
 -- chargeOverride só é usado pelos testes.
@@ -160,20 +181,24 @@ function Run.release(player: Player, chargeOverride: number?): Result?
 	local world = State.world(player)
 	local broken = RunMath.wallsBroken(RunMath.effectivePower(profile.power, charge), world.walls)
 	local runTime = RunMath.stopStuds(broken, world.walls) / run.speed
-	local characterId = Run.rollCharacter(broken, Progress.luckBoost(player, profile), world)
+	-- quem limpa o corredor só sorteia depois da luta com o chefe (BossRoom.victory)
+	local cleared = broken >= #world.walls
+	local characterId = if cleared then "" else Run.rollCharacter(broken, Progress.luckBoost(player, profile), world)
 	Progress.count(player, "walls", broken)
 	local result: Result = {
 		charge = charge,
 		broken = broken,
 		runTime = runTime,
 		characterId = characterId,
-		isNew = profile.index[characterId] ~= true,
+		isNew = not cleared and profile.index[characterId] ~= true,
 	}
 
 	session.running = true
-	session.reward = characterId
+	session.reward = if cleared then nil else characterId
+	session.cleared = cleared
 	player:SetAttribute("Racing", true) -- os outros clientes escondem a montaria dele
-	task.delay(runTime + run.returnDelay, function()
+	-- quem limpou só é levado à sala depois que o cliente termina o pulo no portal
+	task.delay(runTime + (if cleared then Config.BossRoom.portalTime + 0.2 else run.returnDelay), function()
 		if sessions[player] == session then
 			Run.finish(player)
 		end
