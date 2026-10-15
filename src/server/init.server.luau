@@ -19,6 +19,7 @@ local Mounts = require(script.Mounts)
 local Sanctum = require(script.Sanctum)
 local Scenery = require(script.Scenery)
 local State = require(script.State)
+local Boss = require(script.Boss)
 local BossRoom = require(script.BossRoom)
 local Volcano = require(script.Volcano)
 local Wizard = require(script.Wizard)
@@ -32,7 +33,7 @@ local World = require(script.World)
 -- Super: S->C "start", senha, teclas | "result", acertou, ganho | "auto", ganho      C->S senha, acertou
 -- Auto: C->S "buy", nome | "toggle", nome, ligado
 -- Aura: C->S id da aura a equipar          Slot: C->S posição na mochila, slot rápido de destino
-State.createRemotes({ "BagHit", "Charge", "RunResult", "Select", "Fx", "Stat", "GoZone", "Super", "Auto", "Aura", "Slot", "Mount", "Cast", "Sell", "Rebirth", "Potion", "Daily", "Playtime", "Quest", "Fuse", "World", "BossReward" })
+State.createRemotes({ "BagHit", "Charge", "RunResult", "Select", "Fx", "Stat", "GoZone", "Super", "Auto", "Aura", "Slot", "Mount", "Cast", "Sell", "Rebirth", "Potion", "Daily", "Playtime", "Quest", "Fuse", "World", "BossReward", "Boss", "BossHit" })
 local remotes = State.remotes
 
 World.setupLighting()
@@ -837,6 +838,9 @@ local function travel(player: Player, id: any): boolean
 	return true
 end
 remotes.World.OnServerEvent:Connect(travel)
+remotes.BossHit.OnServerEvent:Connect(function(player)
+	Boss.punch(player)
+end)
 
 -- Rede de segurança: quem cair para fora do mapa volta para o próprio terreno.
 task.spawn(function()
@@ -1121,6 +1125,20 @@ if RunService:IsStudio() then
 			return BossRoom.leave(player)
 		elseif command == "bossWin" then
 			return BossRoom.victory(player)
+		elseif command == "boss" then
+			-- value = { action, arg }: estado e controle do golem da sala em que o jogador está
+			local room = player:GetAttribute("Room") or value.world or 1
+			if value.action == "state" then
+				return Boss.debug(room)
+			elseif value.action == "challenge" then
+				return Boss.challenge(player, BossRoom.hasPending(player))
+			elseif value.action == "punch" then
+				return Boss.punch(player, value.arg)
+			elseif value.action == "pending" then
+				BossRoom.setPending(player, value.arg)
+				return true
+			end
+			return Boss.test(room, value.action, value.arg)
 		elseif command == "wizard" then
 			return Wizard.position()
 		elseif command == "pedestal" then

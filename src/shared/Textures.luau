@@ -7,14 +7,17 @@ local Textures: { [string]: string } = {
 	-- <ids>
 	["circle"] = "rbxassetid://84364560595212",
 	["comet"] = "rbxassetid://84582397563706",
+	["crack"] = "rbxassetid://104364376204343",
 	["flame"] = "rbxassetid://73004643767862",
 	["glow"] = "rbxassetid://79755305238513",
 	["ribbon"] = "rbxassetid://81148903023774",
 	["shards"] = "rbxassetid://117191388954195",
 	["slash"] = "rbxassetid://109360615707590",
+	["spikes"] = "rbxassetid://121957698057248",
 	["star"] = "rbxassetid://77895675168056",
 	["streak"] = "rbxassetid://74756202960301",
 	["swirl"] = "rbxassetid://92937482577644",
+	["wave"] = "rbxassetid://111724593846535",
 	-- </ids>
 }
 

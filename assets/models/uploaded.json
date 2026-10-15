@@ -98,5 +98,9 @@
 	"boss_room": {
 		"assetId": "130443178701671",
 		"hash": "8590ba1916753f8f960ec1d97c53e8f3063df18a"
+	},
+	"golem": {
+		"assetId": "94026994518856",
+		"hash": "96c1bebe90da442e70b7464526bb050f26cdab75"
 	}
 }

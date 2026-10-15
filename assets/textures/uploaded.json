@@ -38,5 +38,17 @@
 	"comet": {
 		"assetId": "84582397563706",
 		"hash": "689ccd6cb55ee92867fe3d7e9513ce0501052a30"
+	},
+	"crack": {
+		"assetId": "104364376204343",
+		"hash": "00b851ee282148c2bd30ab3bbeade8a09454f46c"
+	},
+	"spikes": {
+		"assetId": "121957698057248",
+		"hash": "e3250b2c9b47c6f434e45e6b3b113497534aace0"
+	},
+	"wave": {
+		"assetId": "111724593846535",
+		"hash": "4e0fbaae53e358d60ab51dbafb95d3113ecd463c"
 	}
 }

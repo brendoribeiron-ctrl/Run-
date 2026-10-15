@@ -2,12 +2,13 @@
 -- Sala do chefe: a rotunda para onde vai quem limpa o corredor inteiro (modelo em
 -- tools/blender/boss_room.py). Cada mundo tem a sua, no offset dele, com as cores do mundo: o
 -- mesmo modelo, pintado pelo nome das peças. Fica longe e no alto (Config.BossRoom.center), fora
--- do alcance de quem está no mapa. O chefe ainda não existe: o círculo mágico do centro é o lugar
--- dele. Por enquanto a sala tem a entrada encenada pelo cliente e a saída pela porta.
+-- do alcance de quem está no mapa. O chefe (src/server/Boss.luau) dorme no círculo mágico do
+-- centro; a entrada é encenada pelo cliente e a saída é pela porta.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
+local Boss = require(script.Parent.Boss)
 local Config = require(ReplicatedStorage.Shared.Config)
 local Models = require(script.Parent.Models)
 local State = require(script.Parent.State)
@@ -254,28 +255,37 @@ local function build(world: any): Folder?
 		BossRoom.leave(player)
 	end)
 
-	-- o chefe dorme no círculo do centro. A luta ainda não existe: por enquanto, desafiar já
-	-- conta como vitória e faz o sorteio do personagem (BossRoom.victory)
+	-- o chefe dorme no círculo do centro: desafiar acorda ele (Boss.challenge); só quem limpou
+	-- o corredor e ainda não lutou pode desafiar
 	local circle = part(folder, "Challenge", Vector3.new(4, 4, 4), CFrame.new(center + Vector3.new(0, 3 * K, 0)))
 	circle.CanCollide = false
 	circle.CanQuery = false
 	local challenge = Instance.new("ProximityPrompt")
 	challenge.Name = "Challenge"
-	challenge.ObjectText = "Sleeping Master"
+	challenge.ObjectText = Config.Boss.names[world.id] or Config.Boss.names[1]
 	challenge.ActionText = "Challenge"
 	challenge.HoldDuration = 0.6
 	challenge.MaxActivationDistance = ROOM.challengeRange
 	challenge.RequiresLineOfSight = false
 	challenge.Parent = circle
 	challenge.Triggered:Connect(function(player)
-		BossRoom.victory(player)
+		Boss.challenge(player, BossRoom.hasPending(player))
 	end)
 
 	folder.Parent = workspace
+	Boss.build(world, folder, center, challenge)
 	return folder
 end
 
 function BossRoom.build()
+	Boss.onVictory = function(player)
+		BossRoom.victory(player)
+	end
+	Boss.onDefeat = function(player)
+		BossRoom.setPending(player, false)
+	end
+	Boss.loadModels()
+	Boss.start()
 	for _, world in Config.Worlds do
 		task.spawn(build, world)
 	end
@@ -314,7 +324,7 @@ function BossRoom.hasPending(player: Player): boolean
 	return pending[player] == true
 end
 
--- Vitória contra o chefe: sorteia e entrega o personagem, e o cliente mostra o sorteio.
+-- Vitória contra o chefe (Boss.luau chama quando ele se desfaz): sorteia e entrega o personagem, e o cliente mostra o sorteio.
 function BossRoom.victory(player: Player): boolean
 	if not pending[player] or player:GetAttribute("Room") == nil or not BossRoom.rewarder then
 		return false

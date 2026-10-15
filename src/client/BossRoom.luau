@@ -377,6 +377,9 @@ task.spawn(function()
 	end)
 end)
 
+-- Faixas pretas de cinema (a cena do despertar do golem também usa).
+BossRoom.letterbox = letterbox
+
 function BossRoom.debug(): { [string]: any }
 	return { phase = phase, doors = doorsOpen, room = player:GetAttribute("Room") }
 end

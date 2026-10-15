@@ -332,8 +332,40 @@ Config.BossRoom = {
 	introTime = 5.2, -- segundos da cinemática dentro da sala
 }
 
+-- O chefe da sala: um golem ancestral (modelo e animações em tools/blender/golem.py, servidor em
+-- src/server/Boss.luau, cliente em src/client/Boss.luau). Dorme ajoelhado no círculo do centro;
+-- quem desafia acorda ele. Luta como chefe de Sekiro: golpes lentos e bem avisados, pausa cansada
+-- depois de cada um (a hora de bater). A vida é contada em socos; medidas em studs.
+Config.Boss = {
+	names = { "THE SLUMBERING COLOSSUS", "THE MAGMA COLOSSUS" },
+	scale = 1.5, -- o modelo tem ~32 studs de altura; no jogo, ~48 (o tamanho da sala pede)
+	hp = { 80, 110 }, -- socos por jogador na luta, por mundo (crítico conta 2)
+	hitRange = 21, -- distância horizontal máxima do jogador ao centro do golem para o soco contar
+	hitCooldown = 0.22,
+	radius = 7, -- corpo do golem (colisão)
+	walkSpeed = 7,
+	runSpeed = 24,
+	turnSpeed = 2.4, -- radianos por segundo virando para o alvo
+	closeRange = 16, -- daqui para perto ele ataca
+	runRange = 40, -- daqui para longe ele corre
+	chargeRange = 26, -- correndo, a esta distância solta o ataque da corrida
+	rest = { 0.9, 1.6 }, -- pausa depois de cada golpe (segundos, sorteada)
+	rageRest = { 0.5, 1.0 }, -- a mesma pausa com menos da metade da vida
+	rageDamage = 1.2,
+	resetDelay = 4, -- sem ninguém lutando, volta a dormir depois disto
+	knockback = 55,
+	-- golpes: dano, alcance e onde acertam (ahead = distância à frente do golem, side = para a direita)
+	attacks = {
+		Stomp = { damage = 26, radius = 17, ahead = 5, side = 3.6, weight = 3 },
+		Sweep = { damage = 22, radius = 23, arc = 210, weight = 3 },
+		Slam = { damage = 42, radius = 12, ahead = 11, weight = 2 },
+		Pulse = { damage = 30, ahead = 8, side = -7, speed = 52, reach = 72, height = 5, weight = 2 },
+		Charge = { damage = 34, radius = 12, ahead = 8, lunge = 9 },
+	},
+}
+
 -- Modelos de Shared.Assets que não são cenário espalhado (cada um tem o próprio módulo).
-Config.StructureAssets = { boss_room = true, sanctum = true, potion_shop = true, wizard = true, volcano_terrace = true, volcano_base = true, volcano_track = true, volcano_mount = true, volcano_spire = true }
+Config.StructureAssets = { golem = true, boss_room = true, sanctum = true, potion_shop = true, wizard = true, volcano_terrace = true, volcano_base = true, volcano_track = true, volcano_mount = true, volcano_spire = true }
 
 -- Sorteio: pesos em relação ao tier da última parede quebrada.
 Config.Roll = {

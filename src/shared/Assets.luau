@@ -11,6 +11,7 @@ local Assets: { [string]: string } = {
 	["crystal"] = "rbxassetid://76126776322422",
 	["fence"] = "rbxassetid://134403172003232",
 	["flowers"] = "rbxassetid://137324446385705",
+	["golem"] = "rbxassetid://94026994518856",
 	["grass_tuft"] = "rbxassetid://123587998646580",
 	["hill"] = "rbxassetid://110274012459677",
 	["hoverboard"] = "rbxassetid://103140580229735",

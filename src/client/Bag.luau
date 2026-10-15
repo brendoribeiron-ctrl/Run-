@@ -23,6 +23,10 @@ local GOLD = Color3.fromRGB(255, 214, 40)
 local deg = Pose.deg
 
 local Bag = {}
+-- Outro alvo para o mesmo soco (o golem da sala do chefe, src/client/Boss.luau): devolve o centro
+-- dele quando o jogador está perto o bastante, e onTarget avisa o servidor de cada soco.
+Bag.target = nil :: (() -> Vector3?)?
+Bag.onTarget = nil :: (() -> ())?
 
 local bagModel: Model? = nil
 local bagCenter = Vector3.zero
@@ -159,8 +163,9 @@ local function rootPart(): BasePart?
 	return if root and root:IsA("BasePart") then root else nil
 end
 
-local function startPunch()
+local function startPunch(center: Vector3?)
 	local now = os.clock()
+	local facing = center or bagCenter
 	-- encadeia a partir de onde o corpo está; combo zera depois de 1,2 s parado
 	fromPose = if now - punchStart < PUNCH_TIME then punchPose((now - punchStart) / PUNCH_TIME) else GUARD
 	if now - punchStart > 1.2 then
@@ -175,7 +180,7 @@ local function startPunch()
 	local humanoid = character and character:FindFirstChildOfClass("Humanoid")
 	local root = rootPart()
 	if root and humanoid and humanoid.MoveDirection.Magnitude < 0.1 then
-		root.CFrame = CFrame.lookAt(root.Position, Vector3.new(bagCenter.X, root.Position.Y, bagCenter.Z))
+		root.CFrame = CFrame.lookAt(root.Position, Vector3.new(facing.X, root.Position.Y, facing.Z))
 	end
 end
 
@@ -368,7 +373,8 @@ function Bag.start()
 	UserInputService.InputBegan:Connect(function(input, processed)
 		if not processed and isPunchInput(input) then
 			holding = true
-			pending = inRange() -- um clique rápido ainda conta como um soco, mas só perto do saco
+			-- um clique rápido ainda conta como um soco, mas só perto do saco (ou do golem)
+			pending = inRange() or (Bag.target ~= nil and (Bag.target :: () -> Vector3?)() ~= nil)
 		end
 	end)
 	UserInputService.InputEnded:Connect(function(input)
@@ -380,10 +386,20 @@ function Bag.start()
 	-- segurar o botão repete o soco; o servidor ainda aplica o próprio intervalo
 	task.spawn(function()
 		while true do
-			if (holding or pending or Auto.isOn("punch")) and inRange() and not Super.isBusy() and not Windows.current() then
+			local near = inRange()
+			local other = if not near and Bag.target then Bag.target() else nil
+			-- o soco automático é só para o saco; no golem, só segurando o botão
+			if (holding or pending or (Auto.isOn("punch") and near)) and (near or other) and not Super.isBusy() and not Windows.current() then
 				pending = false
-				startPunch()
-				bagHit:FireServer()
+				if other then
+					startPunch(other)
+					if Bag.onTarget then
+						Bag.onTarget()
+					end
+				else
+					startPunch()
+					bagHit:FireServer()
+				end
 				task.wait(Config.Bag.holdInterval)
 			else
 				task.wait()

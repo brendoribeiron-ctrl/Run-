@@ -15,6 +15,9 @@
 #   star    estrela de quatro pontas
 #   glow    brilho redondo e macio
 #   streak  risco de luz com o miolo quente (pilares e faíscas)
+#   spikes  coroa de espinhos toon (estouro das magias do golem)
+#   crack   rachaduras no chão (pisão e esmagamento do golem)
+#   wave    onda no chão com borda dura (pulso do golem)
 
 import math
 import os
@@ -354,6 +357,69 @@ def comet():
     return save("comet", tone, alpha)
 
 
+def spikes():
+    """Coroa de espinhos toon: anel com pontas duras de tamanhos diferentes saindo para fora
+    (o estouro branco das magias de referência). Fica numa peça achatada que cresce e some."""
+    size = 512
+    X, Y = grid(size, size)
+    dx, dy = X - 0.5, Y - 0.5
+    r = np.hypot(dx, dy) * 2
+    a = (np.arctan2(dy, dx) / (2 * np.pi)) % 1.0
+    teeth = 40
+    cell = np.floor(a * teeth)
+    f = a * teeth - cell
+    rng = np.random.default_rng(7)
+    lengths = rng.uniform(0.08, 0.34, teeth + 1)
+    lengths[::5] += 0.12
+    tooth = lengths[cell.astype(np.int64)] * (1 - np.abs(f - 0.5) * 2)
+    band = (r > 0.52) & (r < 0.62 + tooth)
+    inner = (r > 0.47) & (r < 0.5)
+    alpha = np.maximum(band * 1.0, inner * 0.8)
+    tone = np.where(r < 0.66, 1.0, 0.9)
+    return save("spikes", tone, alpha)
+
+
+def crack():
+    """Rachaduras no chão saindo do centro, com galhos, grossas perto do impacto."""
+    size = 512
+    X, Y = grid(size, size)
+    rng = np.random.default_rng(13)
+    width = np.full(X.shape, 9.0)
+    for i in range(9):
+        angle = i * 2 * np.pi / 9 + rng.uniform(-0.25, 0.25)
+        x, y = 0.5, 0.5
+        reach = rng.uniform(0.36, 0.48)
+        steps = 6
+        for s in range(steps):
+            angle += rng.uniform(-0.45, 0.45)
+            step = reach / steps
+            nx, ny = x + np.cos(angle) * step, y + np.sin(angle) * step
+            thick = 0.016 * (1 - s / steps) + 0.004
+            d = segment(X, Y, x, y, nx, ny) / thick
+            width = np.minimum(width, d)
+            if s in (1, 3) and rng.random() < 0.8:
+                b = angle + rng.choice([-1, 1]) * rng.uniform(0.5, 0.9)
+                bx, by = nx + np.cos(b) * step * 1.3, ny + np.sin(b) * step * 1.3
+                width = np.minimum(width, segment(X, Y, nx, ny, bx, by) / (thick * 0.6))
+            x, y = nx, ny
+    r = np.hypot(X - 0.5, Y - 0.5) * 2
+    core = r < 0.09
+    alpha = np.maximum((width < 1.0) * 1.0, core * 1.0)
+    alpha = np.maximum(alpha, np.clip(1.6 - width, 0, 1) * 0.35)
+    return save("crack", np.ones_like(alpha), alpha)
+
+
+def wave():
+    """Onda no chão: borda clara e dura na frente, rastro que apaga para dentro."""
+    size = 512
+    X, Y = grid(size, size)
+    r = np.hypot(X - 0.5, Y - 0.5) * 2
+    edge = (r > 0.9) & (r < 0.97)
+    trail = smooth(0.55, 0.9, r) * (r < 0.9) * 0.55
+    alpha = np.maximum(edge * 1.0, trail)
+    return save("wave", np.ones_like(alpha), alpha)
+
+
 def preview(images):
     """Um plano por textura, lado a lado, com a imagem como luz própria sobre fundo escuro."""
     for obj in list(bpy.data.objects):
@@ -396,7 +462,12 @@ def preview(images):
 
 def main():
     os.makedirs(OUT, exist_ok=True)
-    images = [flame(), circle(), swirl(), ribbon(), slash(), shards(), star(), glow(), streak(), comet()]
+    only = os.environ.get("ONLY")  # ONLY=spikes,crack grava só essas, sem o .blend de prévia
+    if only:
+        for name in only.split(","):
+            globals()[name]()
+        return
+    images = [flame(), circle(), swirl(), ribbon(), slash(), shards(), star(), glow(), streak(), comet(), spikes(), crack(), wave()]
     preview(images)
 
 
