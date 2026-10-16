@@ -1,0 +1,82 @@
+{
+  "name": "VfxLab",
+  "servePort": 34876,
+  "tree": {
+    "$className": "DataModel",
+
+    "ReplicatedStorage": {
+      "Shared": {
+        "$path": "src/shared"
+      },
+      "BridgePort": {
+        "$className": "IntValue",
+        "$properties": { "Value": 34875 }
+      }
+    },
+
+    "ServerScriptService": {
+      "Server": {
+        "$path": "lab/server",
+        "Admin": { "$path": "src/server/Admin.luau" },
+        "DevArea": { "$path": "src/server/DevArea.luau" },
+        "Models": { "$path": "src/server/Models.luau" },
+        "GolemModels": { "$path": "src/server/GolemModels.luau" }
+      }
+    },
+
+    "StarterPlayer": {
+      "StarterPlayerScripts": {
+        "Client": {
+          "$path": "lab/client",
+          "BossFx": { "$path": "src/client/BossFx.luau" },
+          "Fx": { "$path": "src/client/Fx.luau" },
+          "GolemPose": { "$path": "src/client/GolemPose.luau" },
+          "Ui": { "$path": "src/client/Ui.luau" }
+        }
+      }
+    },
+
+    "Workspace": {
+      "$properties": {
+        "FilteringEnabled": true
+      }
+    },
+
+    "Lighting": {
+      "$properties": {
+        "Brightness": 1.8,
+        "ExposureCompensation": -0.35,
+        "ClockTime": 14,
+        "GeographicLatitude": 35,
+        "Ambient": [0.3725, 0.3725, 0.4314],
+        "OutdoorAmbient": [0.4902, 0.4902, 0.549],
+        "EnvironmentDiffuseScale": 0.6,
+        "EnvironmentSpecularScale": 0.3,
+        "GlobalShadows": true,
+        "Technology": "Voxel"
+      },
+      "Bloom": {
+        "$className": "BloomEffect",
+        "$properties": { "Intensity": 1, "Size": 56, "Threshold": 2 }
+      },
+      "ColorCorrection": {
+        "$className": "ColorCorrectionEffect",
+        "$properties": { "Saturation": 0, "Contrast": 0.5, "Brightness": -0.1 }
+      },
+      "Atmosphere": {
+        "$className": "Atmosphere",
+        "$properties": {
+          "Density": 0.3,
+          "Haze": 0,
+          "Glare": 0,
+          "Color": [0.7804, 0.7804, 0.7804],
+          "Decay": [0.4157, 0.4392, 0.4902]
+        }
+      },
+      "SunRays": {
+        "$className": "SunRaysEffect",
+        "$properties": { "Intensity": 0.01, "Spread": 0.1 }
+      }
+    }
+  }
+}

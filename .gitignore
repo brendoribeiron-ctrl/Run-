@@ -18,3 +18,6 @@ sourcemap.json
 
 # Cache do Python dos scripts do Blender
 __pycache__/
+
+# Place do laboratório de efeitos (gerado por rojo build lab.project.json)
+/VfxLab.rbxlx

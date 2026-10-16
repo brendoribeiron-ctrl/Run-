@@ -81,6 +81,21 @@ check("reset limpa o terreno", plot.Pedestal1:FindFirstChild("Character") == nil
 check("no Studio todo mundo é admin", hook:Invoke("isAdmin", player) == true, "não é admin")
 check("jogorui está na lista de admins", table.find(Config.Admins, 10098933976) ~= nil, "fora da lista")
 
+-- /lab e /back: a sala de testes da equipe, longe do mapa
+local area = Config.DevArea
+check("comandos /lab e /back existem", game:GetService("TextChatService"):FindFirstChild("Lab") ~= nil and game:GetService("TextChatService"):FindFirstChild("Back") ~= nil, "sem comando")
+check("sala de testes montada", workspace:FindFirstChild("DevArea") ~= nil and #workspace.DevArea:GetChildren() > 500, "sem chão")
+local labMessage = hook:Invoke("devArea", player, true)
+task.wait(0.5)
+local at = (character:GetPivot().Position - area.center)
+check("/lab leva para a sala de testes", math.abs(at.X) < area.size / 2 and math.abs(at.Z) < area.size / 2 and math.abs(at.Y) < 20, `{labMessage} {at}`)
+task.wait(1.5) -- o vigia passa (no Studio todo mundo é dev: fica)
+at = (character:GetPivot().Position - area.center)
+check("dev fica na sala de testes", math.abs(at.X) < area.size / 2 and math.abs(at.Z) < area.size / 2, tostring(at))
+local backMessage = hook:Invoke("devArea", player, false)
+task.wait(0.5)
+check("/back volta ao terreno", (character:GetPivot().Position - area.center).Magnitude > area.size, tostring(backMessage))
+
 -- /give power|money <quantia> [jogador]
 hook:Invoke("set", player, { power = 0, money = 0 })
 hook:Invoke("giveCommand", player, "/give power 5M")

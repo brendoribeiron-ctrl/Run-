@@ -20,6 +20,14 @@ Config.Admins = {
 -- Em jogo de grupo, quem tem este cargo (rank) ou maior também é admin. 255 = só o dono.
 Config.AdminGroupRank = 255
 
+-- Sala de testes da equipe (src/server/DevArea.luau): chão xadrez longe do mapa, só para dev.
+-- /lab leva, /back devolve ao terreno. Fica a 5000 studs do gramado, para o lado oposto ao
+-- vulcão (+9000).
+Config.DevArea = {
+	center = Vector3.new(-5000, 0, 0),
+	size = 800,
+}
+
 Config.Rarities = {
 	{ id = "Common", color = Color3.fromRGB(180, 180, 180) },
 	{ id = "Uncommon", color = Color3.fromRGB(63, 196, 30) },
@@ -365,7 +373,7 @@ Config.Boss = {
 }
 
 -- Modelos de Shared.Assets que não são cenário espalhado (cada um tem o próprio módulo).
-Config.StructureAssets = { golem = true, boss_room = true, sanctum = true, potion_shop = true, wizard = true, volcano_terrace = true, volcano_base = true, volcano_track = true, volcano_mount = true, volcano_spire = true }
+Config.StructureAssets = { golem = true, boss_fx = true, boss_room = true, sanctum = true, potion_shop = true, wizard = true, volcano_terrace = true, volcano_base = true, volcano_track = true, volcano_mount = true, volcano_spire = true }
 
 -- Sorteio: pesos em relação ao tier da última parede quebrada.
 Config.Roll = {

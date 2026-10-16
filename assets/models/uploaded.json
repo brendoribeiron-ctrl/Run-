@@ -102,5 +102,9 @@
 	"golem": {
 		"assetId": "94026994518856",
 		"hash": "96c1bebe90da442e70b7464526bb050f26cdab75"
+	},
+	"boss_fx": {
+		"assetId": "93327985620490",
+		"hash": "834907d89378d3d1f980559c94e99391d0ad7c2f"
 	}
 }

@@ -16,6 +16,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Config = require(ReplicatedStorage.Shared.Config)
 local Textures = require(ReplicatedStorage.Shared.Textures)
+local Anims = require(ReplicatedStorage.Shared.GolemAnims)
 local Fx = require(script.Parent.Fx)
 
 local BOSS = Config.Boss
@@ -36,6 +37,12 @@ export type Ctx = {
 
 local BossFx = {}
 local rng = Random.new()
+
+-- Cores de cada mundo: fissuras, magia e pedra (as mesmas do GolemModels.STYLES do servidor).
+BossFx.PALETTE = {
+	{ glow = Color3.fromRGB(80, 190, 255), magic = Color3.fromRGB(150, 110, 255), rock = Color3.fromRGB(36, 38, 54) },
+	{ glow = Color3.fromRGB(255, 84, 20), magic = Color3.fromRGB(255, 120, 60), rock = Color3.fromRGB(38, 28, 28) },
+}
 
 local function ease(time: number, style: Enum.EasingStyle?, direction: Enum.EasingDirection?): TweenInfo
 	return TweenInfo.new(time, style or Enum.EasingStyle.Quad, direction or Enum.EasingDirection.Out)
@@ -265,6 +272,232 @@ local function trail(part: BasePart?, color: Color3, width: number, time: number
 end
 
 ---------------------------------------------------------------------------------------------------
+-- Peças 3D (tools/blender/boss_fx.py): o servidor carrega em ReplicatedStorage.BossModels.Fx.
+-- Cada peça tem 10 studs de referência; a escala s é relativa a isso (x = lado, y = cima, z = frente).
+
+type Piece = { part: BasePart, offset: CFrame }
+type Mesh = { part: BasePart, place: (cf: CFrame, s: Vector3) -> () }
+
+local pieces: { [string]: Piece } = {}
+
+local function piece(kind: string): Piece?
+	if pieces[kind] then
+		return pieces[kind]
+	end
+	local models = ReplicatedStorage:FindFirstChild("BossModels")
+	local fx = models and models:FindFirstChild("Fx")
+	if not fx or not fx:IsA("Model") then
+		return nil
+	end
+	local pivot = fx:GetPivot()
+	for _, part in fx:GetDescendants() do
+		local name = if part:IsA("BasePart") then string.match(part.Name, "^(%a+)_") else nil
+		if name and part:IsA("BasePart") then
+			pieces[name] = { part = part, offset = pivot:ToObjectSpace(part.CFrame) }
+		end
+	end
+	return pieces[kind]
+end
+
+-- Escala de um eixo da peça (a importação pode ter girado os eixos dela em relação ao modelo).
+local function along(axis: Vector3, s: Vector3): number
+	return math.max(math.abs(axis.X) * s.X + math.abs(axis.Y) * s.Y + math.abs(axis.Z) * s.Z, 0.002)
+end
+
+local function mesh(kind: string, color: Color3, material: Enum.Material?, transparency: number?): Mesh?
+	local p = piece(kind)
+	if not p then
+		return nil
+	end
+	local part = p.part:Clone()
+	part.Color = color
+	part.Material = material or Enum.Material.Neon
+	part.Transparency = transparency or 0
+	part.CastShadow = false
+	local offset, base = p.offset, p.part.Size
+	local function place(cf: CFrame, s: Vector3)
+		part.Size = Vector3.new(base.X * along(offset.XVector, s), base.Y * along(offset.YVector, s), base.Z * along(offset.ZVector, s))
+		part.CFrame = cf * CFrame.new(offset.Position * s) * offset.Rotation
+	end
+	place(CFrame.new(0, -1e4, 0), Vector3.one * 0.01)
+	part.Parent = Fx.folder
+	return { part = part, place = place }
+end
+
+-- Chama f(t) a cada quadro, t de 0 a 1 ao longo de `time`; depois `done`.
+local function run(time: number, f: (t: number) -> (), done: (() -> ())?)
+	local began = os.clock()
+	local connection
+	connection = RunService.RenderStepped:Connect(function()
+		local t = math.min((os.clock() - began) / time, 1)
+		f(t)
+		if t >= 1 then
+			connection:Disconnect()
+			if done then
+				done()
+			end
+		end
+	end)
+end
+
+local function outQuint(t: number): number
+	return 1 - (1 - t) ^ 5
+end
+
+local function outBack(t: number): number
+	local u = t - 1
+	return 1 + 2.7 * u * u * u + 1.7 * u * u
+end
+
+local function drop(...: Mesh?)
+	for _, m in { ... } do
+		if m then
+			m.part:Destroy()
+		end
+	end
+end
+
+-- Onda de choque em 3D: cúpula achatada que abre, miolo branco, anel deitado correndo na frente
+-- e (opcional) as faixas de vento girando por cima.
+local function shockwave(ctx: Ctx, at: Vector3, radius: number, color: Color3, time: number, swirl: boolean?)
+	local g = ground(ctx, at)
+	local k = radius / 10
+	-- com Bloom, neon claro e pouco transparente vira uma bolha branca: cor cheia e bem transparente
+	local dome = mesh("Dome", color, Enum.Material.Neon, 0.62)
+	local core = mesh("Dome", color:Lerp(WHITE, 0.5), Enum.Material.Neon, 0.45)
+	local ring = mesh("Ring", color:Lerp(WHITE, 0.15), Enum.Material.Neon, 0)
+	local spiral = if swirl then mesh("Swirl", WHITE, Enum.Material.Neon, 0.1) else nil
+	local spin = rng:NextNumber(0, math.pi * 2)
+	run(time, function(t)
+		local e = outQuint(t)
+		if dome then
+			dome.place(g, Vector3.new(k, k * 0.5, k) * (0.12 + 0.88 * e))
+			dome.part.Transparency = 0.62 + 0.38 * t ^ 1.2
+		end
+		if core then
+			local c = math.min(t * 3, 1)
+			core.place(g, Vector3.new(k, k * 0.75, k) * (0.06 + 0.28 * outQuint(c)))
+			core.part.Transparency = 0.45 + 0.55 * c
+		end
+		if ring then
+			local r = k * 1.3 * (0.1 + 0.9 * e)
+			ring.place(g, Vector3.new(r, k * 0.9 * (1 - 0.7 * t), r))
+			ring.part.Transparency = t * t
+		end
+		if spiral then
+			spiral.place(g * CFrame.Angles(0, spin - e * 2.4, 0), Vector3.new(k, k * 0.55, k) * (0.2 + 0.8 * e))
+			spiral.part.Transparency = 0.1 + 0.9 * t
+		end
+	end, function()
+		drop(dome, core, ring, spiral)
+	end)
+end
+
+-- Espinho que brota do chão inclinado para `out`, fica `hold` segundos e afunda.
+local function spike(ctx: Ctx, at: Vector3, height: number, out: Vector3, hold: number, kind: string?, color: Color3?, material: Enum.Material?)
+	local m = mesh(kind or (if rng:NextNumber() < 0.55 then "SpikeA" else "SpikeB"), color or ctx.rock, material or Enum.Material.Slate)
+	if not m then
+		return
+	end
+	local flat = Vector3.new(out.X, 0, out.Z)
+	local yaw = if flat.Magnitude > 0.01 then math.atan2(-flat.X, -flat.Z) else rng:NextNumber(0, 6.28)
+	local cf = ground(ctx, at) * CFrame.Angles(0, yaw, 0) * CFrame.Angles(-math.rad(rng:NextNumber(14, 34)), 0, 0) * CFrame.Angles(0, rng:NextNumber(0, 6.28), 0)
+	local s = height / 10
+	local size = Vector3.new(s * rng:NextNumber(0.8, 1.2), s, s * rng:NextNumber(0.8, 1.2))
+	-- rocha escura some na luz da sala: um miolo aceso, mais fino e um pouco mais alto, aparece
+	-- na ponta e nas frestas
+	local hot = if m.part.Material ~= Enum.Material.Neon then mesh("SpikeB", ctx.glow, Enum.Material.Neon, 0) else nil
+	local hotSize = Vector3.new(s * 0.45, s * 1.06, s * 0.45)
+	local function at(cframe: CFrame)
+		m.place(cframe, size)
+		if hot then
+			hot.place(cframe, hotSize)
+		end
+	end
+	run(0.11, function(t)
+		at(cf * CFrame.new(0, -height * (1 - outBack(t)), 0))
+	end, function()
+		task.delay(hold, function()
+			run(0.4, function(t)
+				at(cf * CFrame.new(0, -height * 0.9 * t * t, 0))
+				m.part.Transparency = math.max(t * 1.6 - 0.6, 0)
+				if hot then
+					hot.part.Transparency = math.min(t * 2, 1)
+				end
+			end, function()
+				drop(m, hot)
+			end)
+		end)
+	end)
+end
+
+-- Anel de espinhos em volta de um ponto (os de perto brotam primeiro).
+local function eruption(ctx: Ctx, center: Vector3, count: number, radius: number, height: number, hold: number, delay: number?)
+	local phase = rng:NextNumber(0, math.pi * 2)
+	for i = 1, count do
+		local a = phase + (i + rng:NextNumber(-0.3, 0.3)) / count * math.pi * 2
+		local dir = Vector3.new(math.cos(a), 0, math.sin(a))
+		local r = radius * rng:NextNumber(0.75, 1.1)
+		task.delay((delay or 0) + r / radius * 0.05, spike, ctx, center + dir * r, height * rng:NextNumber(0.75, 1.15), dir, hold + rng:NextNumber(0, 0.3))
+	end
+end
+
+-- Lua crescente varrendo: gira em volta do Y local de `cf` de `from` a `to` (radianos), com miolo
+-- branco e um fantasma atrasado.
+local function crescent(cf: CFrame, radius: number, color: Color3, time: number, from: number, to: number)
+	local k = radius / 10
+	local ghost = mesh("Slash", color:Lerp(BLACK, 0.15), Enum.Material.Neon, 0.5)
+	local outer = mesh("Slash", color, Enum.Material.Neon, 0)
+	local inner = mesh("Slash", WHITE, Enum.Material.Neon, 0)
+	local lag = (to - from) * 0.18
+	run(time, function(t)
+		local e = outQuint(t)
+		local a = from + (to - from) * e
+		local fade = math.clamp((t - 0.3) / 0.7, 0, 1)
+		if outer then
+			outer.place(cf * CFrame.Angles(0, a, 0), Vector3.new(k, k * 1.3, k) * (0.85 + 0.2 * e))
+			outer.part.Transparency = fade
+		end
+		if inner then
+			inner.place(cf * CFrame.Angles(0, a + lag * 0.3, 0), Vector3.new(k * 0.94, k * 0.7, k * 0.94) * (0.85 + 0.2 * e))
+			inner.part.Transparency = math.min(fade * 1.6, 1)
+		end
+		if ghost then
+			ghost.place(cf * CFrame.Angles(0, a - lag, 0), Vector3.new(k, k, k) * (0.9 + 0.25 * e))
+			ghost.part.Transparency = 0.5 + 0.5 * fade
+		end
+	end, function()
+		drop(ghost, outer, inner)
+	end)
+end
+
+-- Energia puxada para um ponto antes do golpe: riscos que convergem e uma bola de luz que cresce.
+local function gather(point: () -> Vector3?, color: Color3, time: number, radius: number)
+	local began = os.clock()
+	local nextAt = 0
+	local orb = Fx.part(Vector3.one * 0.1, CFrame.new(), color:Lerp(WHITE, 0.5), Enum.Material.Neon, Enum.PartType.Ball)
+	orb.Transparency = 0.2
+	local connection
+	connection = RunService.RenderStepped:Connect(function()
+		local t = os.clock() - began
+		local at = point()
+		if t >= time or not at then
+			connection:Disconnect()
+			orb:Destroy()
+			return
+		end
+		local grow = t / time
+		orb.CFrame = CFrame.new(at)
+		orb.Size = Vector3.one * radius * 0.28 * grow * (1 + 0.15 * math.sin(t * 40))
+		if t >= nextAt then
+			nextAt = t + 0.03
+			local dir = rng:NextUnitVector()
+			Fx.streak(at + dir * radius, -dir * radius * 0.85, color:Lerp(WHITE, rng:NextNumber(0.2, 0.7)), radius * 0.3, 0.2)
+		end
+	end)
+end
+
+---------------------------------------------------------------------------------------------------
 -- Golpes físicos
 
 -- Impacto no chão: o pacote comum de pisão, esmagamento e gancho.
@@ -311,44 +544,59 @@ local function burning(ctx: Ctx, at: Vector3, seconds: number)
 	Debris:AddItem(p, seconds + 1)
 end
 
-local function stompStart(ctx: Ctx)
-	-- o pé que vai pisar esquenta
+-- Ponto de um osso que acompanha a pose a cada quadro (para a energia que se junta na mão).
+local function follow(getCtx: () -> Ctx, bone: string, rest: Vector3): () -> Vector3?
+	return function()
+		local c = getCtx()
+		return c.point(bone, rest * c.scale)
+	end
+end
+
+local function stompStart(ctx: Ctx, getCtx: () -> Ctx)
+	-- o pé que vai pisar esquenta e puxa energia
 	local foot = ctx.point("FootR", Vector3.new(3.6, 1, -1.5) * ctx.scale)
 	light(foot, ctx.glow, 22, 3, 0.8)
+	task.delay(0.15, gather, follow(getCtx, "FootR", Vector3.new(3.6, 1.5, -1.5)), ctx.glow, 0.55, 9 * ctx.scale)
 end
 
 local function stomp(ctx: Ctx)
-	local foot = ctx.point("FootR", Vector3.new(3.6, 0, -1.5) * ctx.scale)
+	local s = ctx.scale
+	local foot = ctx.point("FootR", Vector3.new(3.6, 0, -1.5) * s)
 	quake(ctx, foot, 1)
+	shockwave(ctx, foot, 15 * s, ctx.glow, 0.45)
+	eruption(ctx, foot, 7, 7 * s, 5.5 * s, 0.7)
 end
 
-local function sweepStart(ctx: Ctx)
+local function sweepStart(ctx: Ctx, getCtx: () -> Ctx)
+	task.delay(0.08, gather, follow(getCtx, "HandR", Vector3.new(10, 2, -1.5)), ctx.glow, 0.45, 8 * ctx.scale)
 	task.delay(0.3, trail, ctx.part("HandR"), ctx.glow, 5 * ctx.scale, 0.55)
 	task.delay(0.3, trail, ctx.part("ForearmR"), ctx.glow:Lerp(BLACK, 0.3), 4 * ctx.scale, 0.5)
 end
 
 local function sweep(ctx: Ctx)
-	-- arco de fogo varrendo da direita para a esquerda, na frente do golem
+	-- lua de fogo varrendo da direita para a esquerda, na frente do golem
 	local s = ctx.scale
 	local center = ctx.cf.Position
+	crescent(ctx.cf * CFrame.new(0, 6 * s, 0) * CFrame.Angles(0, 0, math.rad(-8)), 19 * s, ctx.glow, 0.4, -1.3, 0.7)
 	for i = 0, 9 do
 		local angle = math.rad(-80 + i * 18)
 		local at = (ctx.cf * CFrame.Angles(0, angle, 0) * CFrame.new(0, 3 * s, -15 * s)).Position
-		task.delay(i * 0.018, fire, at, ctx.glow, 5, 5 * s, 18, 60)
+		task.delay(i * 0.018, fire, at, ctx.glow, 4, 4 * s, 18, 60)
 	end
 	local hand = ctx.point("HandR", Vector3.new(10, 2, -1.5) * s)
-	pop(Textures.slash, hand, ctx.glow:Lerp(WHITE, 0.3), 10 * s, 26 * s, 0.3, 40)
 	embers(hand, ctx.glow, 30, 55)
 	decal(Textures.wave, ground(ctx, center), ctx.glow, 10 * s, 46 * s, 0.4)
 	light(hand, ctx.glow, 50, 5, 0.5)
 	Fx.shake(0.35 * ctx.near)
 end
 
-local function slamStart(ctx: Ctx)
+local function slamStart(ctx: Ctx, getCtx: () -> Ctx)
 	danger(ctx)
 	for _, side in { "HandR", "HandL" } do
-		local fist = ctx.point(side, Vector3.new(if side == "HandR" then 10 else -10, 4, -1) * ctx.scale)
+		local x = if side == "HandR" then 10 else -10
+		local fist = ctx.point(side, Vector3.new(x, 4, -1) * ctx.scale)
 		light(fist, ctx.glow, 25, 2, 1)
+		task.delay(0.3, gather, follow(getCtx, side, Vector3.new(x, 3, -1.5)), ctx.glow, 0.7, 10 * ctx.scale)
 	end
 end
 
@@ -358,6 +606,9 @@ local function slam(ctx: Ctx)
 	local l = ctx.point("HandL", Vector3.new(-10, 1, -1.5) * s)
 	local mid = (r + l) / 2
 	quake(ctx, mid, 1.45)
+	shockwave(ctx, mid, 28 * s, ctx.glow, 0.6, true)
+	eruption(ctx, mid, 9, 11 * s, 9 * s, 1.3)
+	eruption(ctx, mid, 14, 20 * s, 6 * s, 1.0, 0.08)
 	Fx.burst(ground(ctx, mid).Position + Vector3.new(0, 3, 0), ctx.glow, 28 * s, 0.4)
 	Fx.flash(ctx.glow, 0.35 * ctx.near, 0.35)
 	burning(ctx, mid, 2.2)
@@ -365,19 +616,25 @@ local function slam(ctx: Ctx)
 	task.delay(0.12, decal, Textures.wave, ground(ctx, mid), ctx.glow:Lerp(WHITE, 0.5), 10, 62 * s, 0.6)
 end
 
-local function chargeStart(ctx: Ctx)
+local function chargeStart(ctx: Ctx, getCtx: () -> Ctx)
 	danger(ctx)
+	gather(follow(getCtx, "HandR", Vector3.new(10, 2, -1.5)), ctx.glow, 0.5, 8 * ctx.scale)
 	task.delay(0.3, trail, ctx.part("HandR"), ctx.glow, 5 * ctx.scale, 0.5)
 	dust(ctx.cf.Position + Vector3.new(0, 1, 0), Color3.fromRGB(70, 62, 60), 14, 6 * ctx.scale, 30)
 end
 
 local function charge(ctx: Ctx)
-	-- gancho: coluna de fogo subindo à frente
+	-- gancho: lua de pé subindo à frente, coluna de fogo e uma fileira de espinhos que corre adiante
 	local s = ctx.scale
 	local at = (ctx.cf * CFrame.new(0, 0, -9 * s)).Position
 	quake(ctx, at, 0.9)
+	crescent(ctx.cf * CFrame.new(0, 9 * s, -5 * s) * CFrame.Angles(0, 0, math.pi / 2), 13 * s, ctx.glow, 0.38, 1.0, -1.2)
 	for i = 0, 4 do
 		task.delay(i * 0.04, fire, at + Vector3.new(0, i * 5 * s, 0), ctx.glow, 8, 6 * s, 40, 18)
+	end
+	for i = 1, 6 do
+		local spot = at + ctx.cf.LookVector * (4 + i * 4.2) * s + ctx.cf.RightVector * rng:NextNumber(-1.5, 1.5) * s
+		task.delay(i * 0.045, spike, ctx, spot, (3.5 + i * 0.9) * s, ctx.cf.LookVector, 0.9)
 	end
 	pop(Textures.spikes, at + Vector3.new(0, 12 * s, 0), ctx.glow:Lerp(WHITE, 0.5), 8 * s, 34 * s, 0.35, 30)
 end
@@ -481,39 +738,132 @@ local function pulse(ctx: Ctx)
 	light(g.Position + Vector3.new(0, 8, 0), color, 60, 10, 0.9)
 	embers(g.Position + Vector3.new(0, 2, 0), color, 40, 60)
 
-	-- a onda: borda dura no chão e uma parede baixa de magia, na velocidade da onda do servidor
+	shockwave(ctx, origin, 20 * s, color, 0.5, true)
+	-- coluna de luz que sobe do ponto do golpe e afina
+	local pillar = mesh("Pillar", color:Lerp(WHITE, 0.5), Enum.Material.Neon, 0.05)
+	if pillar then
+		run(0.7, function(t)
+			local width = 2.6 * s * (1 - t) ^ 1.5
+			pillar.place(g, Vector3.new(width, 6 * s * outQuint(math.min(t * 3, 1)), width))
+			pillar.part.Transparency = 0.05 + 0.6 * t
+		end, function()
+			pillar.part:Destroy()
+		end)
+	end
+
+	-- a onda: borda dura no chão e uma parede de magia, na velocidade da onda do servidor;
+	-- atrás dela brotam cristais
 	local reach = A.reach * s
 	local speed = A.speed * s
 	local seconds = reach / speed
 	local wave = decal(Textures.wave, g * CFrame.new(0, 0.1, 0), color:Lerp(WHITE, 0.2), 1, reach * 2, seconds, seconds, nil, 2.5)
 	TweenService:Create(wave, TweenInfo.new(seconds, Enum.EasingStyle.Linear), { Size = Vector3.new(reach * 2, 0.05, reach * 2) }):Play()
-	local count = 40
-	local wall = {}
-	for i = 1, count do
-		local seg = Fx.part(Vector3.new(0.5, 3.2 * s, 1), CFrame.new(g.Position), color:Lerp(WHITE, 0.35), Enum.Material.Neon)
-		seg.Transparency = 0.25
-		wall[i] = seg
-	end
-	local began = os.clock()
-	local connection
-	connection = RunService.RenderStepped:Connect(function()
-		local t = os.clock() - began
-		local r = math.min(t * speed, reach)
-		local fade = math.clamp((t - seconds * 0.75) / (seconds * 0.25), 0, 1)
-		for i, seg in wall do
-			local a = i / count * math.pi * 2
-			local at = g.Position + Vector3.new(math.cos(a) * r, 1.6 * s, math.sin(a) * r)
-			seg.Size = Vector3.new(0.5, 3.2 * s * (1 - fade * 0.6), math.max(r * 2 * math.pi / count * 1.05, 0.3))
-			seg.CFrame = CFrame.lookAt(at, at + Vector3.new(-math.sin(a), 0, math.cos(a)))
-			seg.Transparency = 0.25 + 0.75 * fade
+	local wall = mesh("Band", color:Lerp(WHITE, 0.35), Enum.Material.Neon, 0.2)
+	local rim = mesh("Band", WHITE, Enum.Material.Neon, 0.1)
+	local height = A.height * s
+	local nextShards = 0.05
+	run(seconds, function(t)
+		local r = math.max(t * reach, 0.5)
+		local fade = math.clamp((t - 0.75) / 0.25, 0, 1)
+		if wall then
+			wall.place(g, Vector3.new(r / 10, height / 3 * (1 - fade * 0.6) * (0.9 + 0.1 * math.sin(t * 60)), r / 10))
+			wall.part.Transparency = 0.2 + 0.8 * fade
 		end
-		if t >= seconds then
-			connection:Disconnect()
-			for _, seg in wall do
-				seg:Destroy()
+		if rim then
+			rim.place(g, Vector3.new(r / 10 * 0.995, height / 3 * 0.45, r / 10 * 0.995))
+			rim.part.Transparency = 0.1 + 0.9 * fade
+		end
+		if t >= nextShards and t < 0.85 then
+			nextShards = t + 0.07
+			local phase = rng:NextNumber(0, math.pi * 2)
+			for i = 1, 8 do
+				local a = phase + i / 8 * math.pi * 2
+				local dir = Vector3.new(math.cos(a), 0, math.sin(a))
+				spike(ctx, g.Position + dir * (r - 2 * s), rng:NextNumber(3, 6) * s, dir, 0.3, "Shard", color:Lerp(WHITE, rng:NextNumber(0.1, 0.5)), Enum.Material.Neon)
 			end
 		end
+	end, function()
+		drop(wall, rim)
 	end)
+end
+
+---------------------------------------------------------------------------------------------------
+-- Morte: luz escapando pelas rachaduras, cada vez mais, até o corpo estourar
+
+local CRACKS = {
+	{ "Chest", Vector3.new(0, 18.8, -6.2) },
+	{ "Head", Vector3.new(0, 25, -6) },
+	{ "HandR", Vector3.new(10, 4, -1) },
+	{ "Chest", Vector3.new(5, 16, -5) },
+	{ "HandL", Vector3.new(-10, 4, -1) },
+	{ "Chest", Vector3.new(-5, 20, -5) },
+	{ "Chest", Vector3.new(3, 22, 5) },
+	{ "Chest", Vector3.new(-4, 15, 5) },
+}
+
+local function deathStart(getCtx: () -> Ctx)
+	local crumbleAt = (Anims.clips :: any).Death.events.crumble :: number
+	local beams: { Mesh } = {}
+	local count = 12
+	for i = 1, count do
+		task.delay(crumbleAt * (0.2 + 0.78 * math.sqrt(i / count)), function()
+			local c = getCtx()
+			local s = c.scale
+			local spot = CRACKS[(i - 1) % #CRACKS + 1]
+			local at = c.point(spot[1], spot[2] * s)
+			local center = c.cf.Position + Vector3.new(0, 15 * s, 0)
+			local dir = ((at - center).Unit + rng:NextUnitVector() * 0.6).Unit
+			local beam = mesh("Pillar", c.glow:Lerp(WHITE, 0.6), Enum.Material.Neon, 0)
+			if not beam then
+				return
+			end
+			table.insert(beams, beam)
+			local cf = CFrame.lookAt(at, at + dir) * CFrame.Angles(-math.pi / 2, 0, 0)
+			local length = rng:NextNumber(1.0, 1.7) * s
+			run(0.25, function(t)
+				local w = 0.45 * s * outBack(t)
+				beam.place(cf, Vector3.new(w, length * outQuint(t), w))
+			end)
+			pop(Textures.star, at, c.glow:Lerp(WHITE, 0.6), 2 * s, 9 * s, 0.3, 60)
+			embers(at, c.glow, 10, 30)
+			light(at, c.glow, 30, 3, 0.6)
+			Fx.shake((0.15 + 0.25 * i / count) * c.near)
+		end)
+	end
+	task.delay(crumbleAt + 0.02, function()
+		for _, beam in beams do
+			beam.part:Destroy()
+		end
+	end)
+end
+
+-- O estouro, no quadro em que as peças se soltam (src/client/Boss.luau chama).
+function BossFx.death(ctx: Ctx)
+	local s = ctx.scale
+	local chest = ctx.point("Chest", Vector3.new(0, 18.8, -6.2) * s)
+	local color = ctx.glow
+	impactFrame(color)
+	Fx.flash(WHITE, 0.35 * ctx.near, 0.3)
+	Fx.shake(1.2 * ctx.near)
+	shockwave(ctx, ctx.cf.Position, 45 * s, color, 0.9, true)
+	Fx.burst(chest, color, 22 * s, 0.35)
+	pop(Textures.spikes, chest, WHITE, 10 * s, 80 * s, 0.6, 30)
+	light(chest, color, 90, 12, 1.5)
+	embers(chest, color, 80, 70)
+	dust(ctx.cf.Position + Vector3.new(0, 2, 0), Color3.fromRGB(70, 62, 60), 40, 9 * s, 55)
+	decal(Textures.wave, ground(ctx, ctx.cf.Position), color:Lerp(WHITE, 0.4), 10, 140 * s, 0.8)
+	-- a alma do golem sobe numa coluna de luz
+	local soul = mesh("Pillar", color:Lerp(WHITE, 0.55), Enum.Material.Neon, 0.1)
+	if soul then
+		local base = ground(ctx, ctx.cf.Position)
+		run(1.8, function(t)
+			local width = 4 * s * (1 - t) ^ 1.2 * (1 + 0.08 * math.sin(t * 50))
+			soul.place(base, Vector3.new(width, 10 * s * outQuint(math.min(t * 2, 1)), width))
+			soul.part.Transparency = 0.1 + 0.9 * t ^ 2
+		end, function()
+			soul.part:Destroy()
+		end)
+	end
 end
 
 ---------------------------------------------------------------------------------------------------
@@ -521,15 +871,17 @@ end
 -- Começo de cada animação (avisos, rastros).
 function BossFx.start(clip: string, ctx: Ctx, getCtx: () -> Ctx)
 	if clip == "Stomp" then
-		stompStart(ctx)
+		stompStart(ctx, getCtx)
 	elseif clip == "Sweep" then
-		sweepStart(ctx)
+		sweepStart(ctx, getCtx)
 	elseif clip == "Slam" then
-		slamStart(ctx)
+		slamStart(ctx, getCtx)
 	elseif clip == "Charge" then
-		chargeStart(ctx)
+		chargeStart(ctx, getCtx)
 	elseif clip == "Pulse" then
 		pulseCharge(ctx, 1.0, getCtx)
+	elseif clip == "Death" then
+		deathStart(getCtx)
 	end
 end
 
@@ -551,6 +903,7 @@ function BossFx.event(clip: string, name: string, ctx: Ctx)
 		local head = ctx.point("Head", Vector3.new(0, 25, -6) * ctx.scale)
 		Fx.shake(1.1 * ctx.near)
 		pop(Textures.spikes, head, ctx.glow:Lerp(WHITE, 0.5), 10, 70, 0.6, 20)
+		shockwave(ctx, ctx.cf.Position, 40 * ctx.scale, ctx.glow, 0.8, true)
 		decal(Textures.wave, ground(ctx, ctx.cf.Position), ctx.glow, 10, 120 * ctx.scale, 0.7)
 		dust(ctx.cf.Position + Vector3.new(0, 2, 0), Color3.fromRGB(70, 62, 60), 30, 8, 50)
 		embers(head, ctx.glow, 40, 40)
@@ -571,6 +924,7 @@ end
 function BossFx.struck(at: Vector3, normal: Vector3, crit: boolean, color: Color3)
 	Fx.star(at, normal, WHITE, if crit then 16 else 8, if crit then 4 else 3, 0.22)
 	Fx.burst(at, if crit then Color3.fromRGB(255, 214, 40) else WHITE, if crit then 9 else 4, 0.2)
+	Fx.shock(at, normal, if crit then Color3.fromRGB(255, 214, 40) else WHITE, if crit then 12 else 7, 0.22)
 	Fx.cubes(at, color, if crit then 8 else 4, 18, normal * 20, 0.6)
 	embers(at, color, if crit then 16 else 6, 30)
 end

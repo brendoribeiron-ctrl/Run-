@@ -1,10 +1,13 @@
 # Captura a janela do Roblox Studio em PNG, mesmo sem ela estar em primeiro plano.
 #   powershell -File tools\screenshot.ps1 -Out shots\nome.png
+#   -Window VfxLab   escolhe a janela pelo título (jogo e laboratório de efeitos abertos juntos);
+#                    sem -Window, pega uma janela que não seja a do laboratório
 param(
 	[Parameter(Mandatory = $true)][string]$Out,
 	[int]$Count = 1,
 	[int]$IntervalMs = 400,
-	[int]$DelayMs = 0
+	[int]$DelayMs = 0,
+	[string]$Window = ''
 )
 
 Add-Type -AssemblyName System.Drawing
@@ -21,7 +24,12 @@ public static class StudioShot {
 '@
 
 [StudioShot]::SetProcessDPIAware() | Out-Null
-$studio = Get-Process RobloxStudioBeta -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowHandle -ne 0 } | Select-Object -First 1
+$windows = Get-Process RobloxStudioBeta -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowHandle -ne 0 }
+if ($Window) {
+	$studio = $windows | Where-Object { $_.MainWindowTitle -like "*$Window*" } | Select-Object -First 1
+} else {
+	$studio = $windows | Where-Object { $_.MainWindowTitle -notlike '*VfxLab*' } | Select-Object -First 1
+}
 if (-not $studio) { Write-Error 'Roblox Studio não está aberto.'; exit 1 }
 $handle = $studio.MainWindowHandle
 if ([StudioShot]::IsIconic($handle)) { Write-Error 'A janela do Studio está minimizada.'; exit 1 }

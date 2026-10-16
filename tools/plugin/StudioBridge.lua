@@ -1,12 +1,22 @@
 -- StudioBridge: plugin local que executa Luau enviado por tools/bridge.cjs (127.0.0.1:34871).
 -- Instalação: copiar este arquivo para %LOCALAPPDATA%\Roblox\Plugins.
 -- Só fala com a própria máquina. Apague o arquivo da pasta Plugins para desligar.
+--
+-- O plugin roda em toda janela do Studio. Um place com ReplicatedStorage.BridgePort (IntValue)
+-- fala na porta dele (o laboratório de efeitos usa 34872), e o jogo e o laboratório abertos
+-- juntos não pegam os comandos um do outro.
 
 local HttpService = game:GetService("HttpService")
 local LogService = game:GetService("LogService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
 local URL = "http://127.0.0.1:34871"
+local function refreshUrl()
+	local marker = ReplicatedStorage:FindFirstChild("BridgePort")
+	local port = if marker and marker:IsA("IntValue") and marker.Value > 0 then marker.Value else 34871
+	URL = "http://127.0.0.1:" .. port
+end
 
 local context
 if not RunService:IsRunning() then
@@ -42,6 +52,8 @@ local function runJob(job)
 	local tests = server and server:FindFirstChild("tests")
 	local module = job.module and tests and tests:FindFirstChild(job.module)
 	if module and module:IsA("ModuleScript") then
+		-- argumentos da linha de comando: o módulo lê tests:GetAttribute("Args") (JSON)
+		tests:SetAttribute("Args", HttpService:JSONEncode(job.args or {}))
 		chunk = function()
 			local copy = module:Clone() -- clone: require não reaproveita o resultado anterior
 			copy.Parent = tests
@@ -93,6 +105,7 @@ end
 
 task.spawn(function()
 	while true do
+		refreshUrl() -- o Rojo pode sincronizar a marca depois que o plugin já começou
 		local ok, reply = pcall(function()
 			return HttpService:RequestAsync({ Url = URL .. "/poll?ctx=" .. context, Method = "GET" })
 		end)

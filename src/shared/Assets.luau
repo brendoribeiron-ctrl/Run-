@@ -5,6 +5,7 @@
 
 local Assets: { [string]: string } = {
 	-- <ids>
+	["boss_fx"] = "rbxassetid://93327985620490",
 	["boss_room"] = "rbxassetid://130443178701671",
 	["bush"] = "rbxassetid://83178130107430",
 	["carpet"] = "rbxassetid://102145025705012",

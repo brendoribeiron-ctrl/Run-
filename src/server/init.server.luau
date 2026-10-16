@@ -10,6 +10,8 @@ local ServerStorage = game:GetService("ServerStorage")
 local Config = require(ReplicatedStorage.Shared.Config)
 local Format = require(ReplicatedStorage.Shared.Format)
 local RunMath = require(ReplicatedStorage.Shared.RunMath)
+local Admin = require(script.Admin)
+local DevArea = require(script.DevArea)
 local Hall = require(script.Hall)
 local Pedestals = require(script.Pedestals)
 local Progress = require(script.Progress)
@@ -40,6 +42,7 @@ World.setupLighting()
 World.buildLobby()
 Hall.build(World.buildHallway())
 World.buildBounds()
+DevArea.start(Admin.isAdmin, State.homeCFrame)
 -- os modelos vêm da Roblox (uma chamada por modelo): monta em paralelo, sem segurar o servidor
 task.spawn(function()
 	if Sanctum.build() then
@@ -910,35 +913,7 @@ local function giveAll(player: Player): number
 	return #profile.inventory
 end
 
--- Quem é admin: todo mundo no Studio; no jogo publicado, o dono, quem está em Config.Admins
--- e, em jogo de grupo, quem tem o cargo de Config.AdminGroupRank para cima.
-local adminCache: { [number]: boolean } = {}
-local function isAdmin(player: Player): boolean
-	if RunService:IsStudio() then
-		return true
-	end
-	local cached = adminCache[player.UserId]
-	if cached ~= nil then
-		return cached
-	end
-	local admin = table.find(Config.Admins, player.UserId) ~= nil
-	if not admin then
-		if game.CreatorType == Enum.CreatorType.User then
-			admin = player.UserId == game.CreatorId
-		else
-			-- consulta à Roblox: pode falhar; nesse caso não é admin agora e tenta de novo depois
-			local ok, rank = pcall(function()
-				return player:GetRankInGroup(game.CreatorId)
-			end)
-			if not ok then
-				return false
-			end
-			admin = rank >= Config.AdminGroupRank
-		end
-	end
-	adminCache[player.UserId] = admin
-	return admin
-end
+local isAdmin = Admin.isAdmin
 
 -- Zera o jogador: perfil de jogador novo, terreno limpo e boneco de volta ao começo.
 local function resetPlayer(player: Player): boolean
@@ -1032,6 +1007,38 @@ local function adminCommand(name: string, alias: string, action: (admin: Player,
 		if target ~= admin then
 			remotes.Fx:FireClient(target, "toast", message)
 		end
+	end)
+	command.Parent = game:GetService("TextChatService")
+end
+-- Sala de testes da equipe (DevArea): /lab leva o dev para lá, /back devolve ao terreno.
+-- Devolve o aviso para o dev.
+local function devAreaCommand(admin: Player, go: boolean): string
+	local root = State.root(admin)
+	if not root or Run.isBusy(admin) then
+		return "Finish what you are doing first."
+	end
+	local target = if go then DevArea.arriveCFrame() else State.homeCFrame(admin)
+	if not target then
+		return "No plot to go back to."
+	end
+	-- o mapa é carregado por proximidade: pede o destino antes, senão o boneco chega sem chão
+	pcall(function()
+		admin:RequestStreamAroundAsync(target.Position, 5)
+	end)
+	root.AssemblyLinearVelocity = Vector3.zero
+	;(admin.Character :: Model):PivotTo(target)
+	return if go then "DEV AREA: test anything here. /back to return." else "Back to your plot."
+end
+for name, alias in { Lab = "/lab", Back = "/back" } do
+	local command = Instance.new("TextChatCommand")
+	command.Name = name
+	command.PrimaryAlias = alias
+	command.Triggered:Connect(function(source)
+		local admin = Players:GetPlayerByUserId(source.UserId)
+		if not admin or not isAdmin(admin) then
+			return
+		end
+		remotes.Fx:FireClient(admin, "toast", devAreaCommand(admin, name == "Lab"))
 	end)
 	command.Parent = game:GetService("TextChatService")
 end
@@ -1191,6 +1198,8 @@ if RunService:IsStudio() then
 			return (giveCommand(player, value))
 		elseif command == "isAdmin" then
 			return isAdmin(player)
+		elseif command == "devArea" then
+			return devAreaCommand(player, value == true)
 		elseif command == "giveAll" then
 			return giveAll(player)
 		elseif command == "auraEquip" then

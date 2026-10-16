@@ -17,7 +17,7 @@ local RunService = game:GetService("RunService")
 
 local Anims = require(ReplicatedStorage.Shared.GolemAnims)
 local Config = require(ReplicatedStorage.Shared.Config)
-local Models = require(script.Parent.Models)
+local GolemModels = require(script.Parent.GolemModels)
 local PlayerData = require(script.Parent.PlayerData)
 local State = require(script.Parent.State)
 
@@ -58,28 +58,7 @@ local golems: { [number]: Golem } = {}
 local lastPunch: { [Player]: number } = {}
 local rng = Random.new()
 
-local function rgb(r: number, g: number, b: number): Color3
-	return Color3.fromRGB(r, g, b)
-end
-local M = Enum.Material
--- arcano (mundo 1): pedra azul-noite e fissuras de magia azul; magma (mundo 2): basalto e brasa
-local STYLES: { { [string]: Models.Style } } = {
-	{
-		Rock = { color = rgb(36, 38, 54), material = M.Slate },
-		Plate = { color = rgb(62, 66, 90), material = M.Slate },
-		Trim = { color = rgb(255, 196, 72), material = M.Metal },
-		Magma = { color = rgb(80, 190, 255), material = M.Neon },
-		Ember = { color = rgb(220, 245, 255), material = M.Neon },
-	},
-	{
-		Rock = { color = rgb(38, 28, 28), material = M.Basalt },
-		Plate = { color = rgb(66, 48, 46), material = M.Basalt },
-		Trim = { color = rgb(255, 168, 56), material = M.Metal },
-		Magma = { color = rgb(255, 84, 20), material = M.Neon },
-		Ember = { color = rgb(255, 216, 96), material = M.Neon },
-	},
-}
-Boss.STYLES = STYLES
+Boss.STYLES = GolemModels.STYLES
 
 local function now(): number
 	return workspace:GetServerTimeNow()
@@ -508,24 +487,7 @@ end
 
 -- O visual de cada mundo fica em ReplicatedStorage.BossModels, para os clientes copiarem.
 function Boss.loadModels()
-	local holder = Instance.new("Folder")
-	holder.Name = "BossModels"
-	holder.Parent = ReplicatedStorage
-	for _, world in Config.Worlds do
-		task.spawn(function()
-			local model = Models.load("golem", STYLES[world.id] or STYLES[1])
-			if not model then
-				warn("[Boss] o modelo do golem não carregou")
-				return
-			end
-			if S ~= 1 then
-				model:ScaleTo(model:GetScale() * S)
-			end
-			model:PivotTo(CFrame.identity)
-			model.Name = "Golem" .. world.id
-			model.Parent = holder
-		end)
-	end
+	GolemModels.load()
 end
 
 -- Desafio no círculo: acorda o golem. A luta começa quando ele termina de levantar.

@@ -2,14 +2,18 @@
 // consulta este servidor e executa o Luau enfileirado no contexto pedido.
 //
 //   node tools/bridge.cjs serve
-//   node tools/bridge.cjs run <edit|server|client> "<luau ou caminho de arquivo>" [timeoutMs]
+//   node tools/bridge.cjs run <edit|server|client> "<luau ou caminho de arquivo>" [timeoutMs] [args...]
+//   (os args chegam ao módulo de teste como JSON no atributo Args da pasta tests)
 //   node tools/bridge.cjs status
+//
+// Outro place (o laboratório de efeitos, lab.project.json) usa outra porta: BRIDGE_PORT=34872.
+// O plugin lê a porta de ReplicatedStorage.BridgePort; sem ela, 34871.
 
 const http = require("http");
 const fs = require("fs");
 const path = require("path");
 
-const PORT = 34871;
+const PORT = Number(process.env.BRIDGE_PORT) || 34871;
 const HOST = "127.0.0.1";
 
 function readBody(req) {
@@ -39,7 +43,7 @@ function serve() {
 			lastSeen[ctx] = Date.now();
 			const job = queues[ctx].shift();
 			if (job) console.log(`job ${job.id} entregue a ${ctx}`);
-			return json(200, job ? { id: job.id, code: job.code, module: job.module } : {});
+			return json(200, job ? { id: job.id, code: job.code, module: job.module, args: job.args } : {});
 		}
 
 		if (req.method === "POST" && url.pathname === "/result") {
@@ -65,7 +69,7 @@ function serve() {
 				json(200, { id, ok: false, error: "timeout: nenhum plugin respondeu neste contexto", log: [] });
 			}, body.timeout || 20000);
 			waiting.set(id, { json, timer });
-			queues[body.ctx].push({ id, code: body.code, module: body.module });
+			queues[body.ctx].push({ id, code: body.code, module: body.module, args: body.args });
 			return;
 		}
 
@@ -102,7 +106,7 @@ function request(method, path, body) {
 }
 
 async function main() {
-	const [command, ctx, source, timeout] = process.argv.slice(2);
+	const [command, ctx, source, timeout, ...args] = process.argv.slice(2);
 	if (command === "serve") return serve();
 	if (command === "status") return console.log(JSON.stringify(await request("GET", "/status"), null, 2));
 	if (command === "run") {
@@ -110,7 +114,7 @@ async function main() {
 		const code = isFile ? fs.readFileSync(source, "utf8") : source;
 		// arquivos de src/server/tests/ também vão como nome de módulo (ServerScriptService.Server.tests, sincronizado pelo Rojo)
 		const module = isFile ? path.basename(source).replace(/\.luau?$/, "") : undefined;
-		const result = await request("POST", "/run", { ctx, code, module, timeout: Number(timeout) || 20000 });
+		const result = await request("POST", "/run", { ctx, code, module, args, timeout: Number(timeout) || 20000 });
 		for (const line of result.log || []) console.log("  | " + line);
 		if (result.ok) {
 			console.log("=> " + result.result);
