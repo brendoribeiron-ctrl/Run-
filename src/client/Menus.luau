@@ -421,7 +421,8 @@ local function buildRank()
 end
 
 ---------------------------------------------------------------------------------------------------
--- Montarias: compra uma vez com dinheiro, depois equipa e desequipa. Só visual.
+-- Montarias: compra uma vez com dinheiro, depois escolhe qual usar; subir e descer é na tecla M
+-- (src/client/Mount.luau). Só visual.
 
 local mountCards: { [string]: { frame: Frame, status: TextLabel, border: UIStroke } } = {}
 
@@ -437,7 +438,7 @@ local function refreshMounts()
 	for _, info in Config.Mounts do
 		local entry = mountCards[info.id]
 		local on = equipped == info.id
-		entry.status.Text = if on then "RIDING" elseif owned[info.id] then "RIDE" else `BUY ${Format.abbreviate(info.price)}`
+		entry.status.Text = if on then "SELECTED" elseif owned[info.id] then "SELECT" else `BUY ${Format.abbreviate(info.price)}`
 		entry.status.TextColor3 = if on then P.money elseif owned[info.id] then Ui.white else P.yellowLine
 		entry.border.Color = if on then Ui.white else P.outline
 		entry.border.Thickness = if on then 5 else 3
@@ -475,7 +476,7 @@ end
 local function buildMounts()
 	local remote = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("Mount") :: RemoteEvent
 	local window = Windows.create("Mounts", "MOUNTS", Vector2.new(640, 460), Color3.fromRGB(30, 160, 240), refreshMounts)
-	Ui.text(window, { name = "Help", text = "Buy once, ride anywhere. Same speed, more style. Click again to hop off.", color = MUTED, size = UDim2.new(1, -40, 0, 22), position = UDim2.fromOffset(20, 46), textSize = 16, stroke = 2 })
+	Ui.text(window, { name = "Help", text = if UserInputService.TouchEnabled then "Buy once, pick one, then tap RIDE to hop on and off." else "Buy once, pick one, then press M to hop on and off.", color = MUTED, size = UDim2.new(1, -40, 0, 22), position = UDim2.fromOffset(20, 46), textSize = 16, stroke = 2 })
 	local grid = gridArea(window, 72, 18, Vector2.new(280, 300))
 	for order, info in Config.Mounts do
 		local frame, border = card(grid, info.id, order)

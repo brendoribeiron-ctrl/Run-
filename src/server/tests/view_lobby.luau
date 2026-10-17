@@ -34,6 +34,7 @@ for index, shot in shots do
 	if mount then
 		hook:Invoke("set", player, { mounts = { hoverboard = true, carpet = true }, mount = "" })
 		hook:Invoke("mount", player, mount)
+		player:SetAttribute("Riding", true)
 	end
 	character:PivotTo(CFrame.new(shot[3]))
 	hook:Invoke("ui", player, { command = "camera", arg = { from = shot[1], to = shot[2], seconds = 5 } })

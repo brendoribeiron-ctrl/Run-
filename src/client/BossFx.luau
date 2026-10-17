@@ -868,9 +868,27 @@ end
 
 ---------------------------------------------------------------------------------------------------
 
+-- EXPERIMENTOS (src/shared/GolemExperiment.luau): o golpe novo do clip X fica em BossFx<X> e usa
+-- as ferramentas daqui (kit) e as peças de terra de BossFxEarth.
+local V2 = {
+	SlamV2 = require(script.Parent.BossFxSlamV2),
+	ChargeV2 = require(script.Parent.BossFxChargeV2),
+}
+local kit = {
+	decal = decal, ground = ground, fire = fire, dust = dust, embers = embers, light = light, pop = pop,
+	impactFrame = impactFrame, danger = danger, gather = gather, follow = follow, holder = holder,
+	mesh = mesh, run = run, drop = drop, outQuint = outQuint, outBack = outBack, shockwave = shockwave,
+	crescent = crescent, trail = trail, quake = quake,
+}
+local v2GetCtx: { [string]: () -> Ctx } = {}
+
 -- Começo de cada animação (avisos, rastros).
 function BossFx.start(clip: string, ctx: Ctx, getCtx: () -> Ctx)
-	if clip == "Stomp" then
+	local v2 = V2[clip]
+	if v2 then -- EXPERIMENTO
+		v2GetCtx[clip] = getCtx
+		v2.start(kit, ctx, getCtx, (Anims.clips :: any)[clip].events.impact)
+	elseif clip == "Stomp" then
 		stompStart(ctx, getCtx)
 	elseif clip == "Sweep" then
 		sweepStart(ctx, getCtx)
@@ -887,6 +905,14 @@ end
 
 -- Eventos marcados na animação (tools/blender/golem.py).
 function BossFx.event(clip: string, name: string, ctx: Ctx)
+	local v2 = V2[clip]
+	if v2 then -- EXPERIMENTO
+		local events = (Anims.clips :: any)[clip].events
+		v2.event(kit, name, ctx, v2GetCtx[clip] or function()
+			return ctx
+		end, events.impact, events[name] or 0)
+		return
+	end
 	if name == "impact" then
 		if clip == "Stomp" then
 			stomp(ctx)

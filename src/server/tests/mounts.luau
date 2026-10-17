@@ -1,4 +1,4 @@
--- Montarias: modelos prontos, compra com dinheiro, equipar e desequipar, e o cliente mostrando
+-- Montarias: modelos prontos, compra com dinheiro, escolher no menu, subir e descer (tecla M), e o cliente mostrando
 -- a montaria embaixo do boneco (que sobe um pouco). Também confere o limite de zoom da câmera.
 --   node tools/bridge.cjs run server src/server/tests/mounts.luau 90000
 
@@ -64,14 +64,17 @@ check("o boneco sobe", math.abs(riding.hip - riding.baseHip - board.lift) < 0.05
 local feet = root.Position.Y - root.Size.Y / 2 - riding.baseHip
 check("o skate fica embaixo dos pés", math.abs(riding.height - feet) < 0.6 and feet > Config.World.groundY + 1, `skate {riding.height}, pés {feet}`)
 
-check("clicar de novo desce", hook:Invoke("mount", player, board.id) == "off" and state().mount == "", state().mount)
+check("clicar de novo continua escolhida e montado", hook:Invoke("mount", player, board.id) == "selected" and state().mount == board.id and player:GetAttribute("Riding") == true, state().mount)
+check("M desce", hook:Invoke("ride", player) == false and player:GetAttribute("Riding") == nil and state().mount == board.id, tostring(player:GetAttribute("Riding")))
 task.wait(0.8)
 local walking = client()
 check("a pé volta à altura normal", walking.id == "" and math.abs(walking.hip - walking.baseHip) < 0.05, `{walking.hip}`)
-check("não cobra duas vezes", hook:Invoke("mount", player, board.id) == "on" and state().money == 0, tostring(state().money))
+check("M sobe de novo", hook:Invoke("ride", player) == true and player:GetAttribute("Riding") == true, "")
+hook:Invoke("ride", player)
+check("não cobra duas vezes", hook:Invoke("mount", player, board.id) == "selected" and state().money == 0, tostring(state().money))
 
 hook:Invoke("set", player, { money = carpet.price })
-check("compra o tapete e troca", hook:Invoke("mount", player, carpet.id) == "bought" and state().mount == carpet.id and state().mounts[board.id] == true, state().mount)
+check("compra o tapete, troca e sobe", hook:Invoke("mount", player, carpet.id) == "bought" and state().mount == carpet.id and state().mounts[board.id] == true and player:GetAttribute("Riding") == true, state().mount)
 task.wait(1.2)
 local flying = client()
 check("cliente mostra o tapete", flying.id == carpet.id and flying.shown and flying.segments == 7, `{flying.id} {flying.segments}`)
@@ -104,8 +107,11 @@ hook:Invoke("mount", player, board.id)
 task.wait(0.8)
 local boardSwing = walkSpread()
 check("o skate é animado andando", boardSwing > 6, `braço variou {boardSwing} graus`)
+check("trocar no menu montado troca embaixo do boneco", client().id == board.id, client().id)
 check("o passeio mede a velocidade", client().moving >= 0 and surfing.id == carpet.id, tostring(client().moving))
 
-hook:Invoke("mount", player, board.id)
+hook:Invoke("ride", player)
+hook:Invoke("set", player, { mount = "" })
+check("sem montaria escolhida M não sobe", hook:Invoke("ride", player) == nil and player:GetAttribute("Riding") == nil, "")
 task.wait(0.5)
 return `{#passed} verificações OK: ` .. table.concat(passed, "; ")

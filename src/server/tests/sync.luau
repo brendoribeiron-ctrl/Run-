@@ -32,13 +32,14 @@ local connection = remote.OnServerEvent:Connect(function(_, data)
 end)
 hook:Invoke("set", player, { mounts = { hoverboard = true }, mount = "" })
 hook:Invoke("mount", player, "hoverboard")
+hook:Invoke("ride", player)
 task.wait(1.5)
 local riding = got
 check("cliente manda a pose enquanto ela está ativa", riding >= 12 and riding <= 40, riding .. " pacotes em 1,5 s")
 local state = ui("poseSync")
 check("pacote pequeno", size == state.bytes and size <= 128, size .. " bytes")
 check("a pose sobrevive ao empacotamento", state.angleError < 0.5 and state.offsetError < 0.01, `{state.angleError} graus, {state.offsetError} studs`)
-hook:Invoke("mount", player, "hoverboard")
+hook:Invoke("ride", player)
 connection:Disconnect()
 
 -- estados que os outros clientes usam para a aura

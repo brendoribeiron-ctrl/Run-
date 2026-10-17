@@ -214,7 +214,8 @@ function apply(id: string)
 	if not object then
 		return
 	end
-	local entry = layout[id] or HudLayout.default()
+	-- layout salvo é só do celular: no PC (sem editor) o HUD fica sempre no padrão
+	local entry = (Platform.isTouch() and layout[id]) or HudLayout.default()
 	local base = baseOf(id, object)
 	write(object, "Position", base.position + UDim2.fromScale(entry.x, entry.y))
 	if id == "Jump" then
@@ -511,6 +512,9 @@ function HudEditor.start()
 	build()
 	Platform.watch(function()
 		gear.Visible = Platform.isTouch() and not editing
+		if not editing then
+			applyAll()
+		end
 	end)
 
 	local function load()

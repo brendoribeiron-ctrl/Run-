@@ -17,6 +17,7 @@ local RunService = game:GetService("RunService")
 
 local Anims = require(ReplicatedStorage.Shared.GolemAnims)
 local Config = require(ReplicatedStorage.Shared.Config)
+local Experiment = require(ReplicatedStorage.Shared.GolemExperiment) -- EXPERIMENTO (Config.Boss.slamV2)
 local GolemModels = require(script.Parent.GolemModels)
 local PlayerData = require(script.Parent.PlayerData)
 local State = require(script.Parent.State)
@@ -32,6 +33,7 @@ Boss.onVictory = nil :: ((Player) -> ())?
 Boss.onDefeat = nil :: ((Player) -> ())?
 
 type Golem = {
+	key: string, -- nome da sala (BossRoom.luau): cada jogador tem a sua
 	world: any,
 	center: Vector3,
 	model: Model,
@@ -54,7 +56,7 @@ type Golem = {
 	deadAt: number,
 }
 
-local golems: { [number]: Golem } = {}
+local golems: { [string]: Golem } = {}
 local lastPunch: { [Player]: number } = {}
 local rng = Random.new()
 
@@ -107,7 +109,7 @@ end
 local function fighters(g: Golem): { Player }
 	local list = {}
 	for _, player in Players:GetPlayers() do
-		if player:GetAttribute("Room") == g.world.id then
+		if player:GetAttribute("RoomKey") == g.key then
 			local character = player.Character
 			local humanoid = character and character:FindFirstChildOfClass("Humanoid")
 			if humanoid and humanoid.Health > 0 and character:FindFirstChild("HumanoidRootPart") then
@@ -120,7 +122,7 @@ end
 
 local function toRoom(g: Golem, ...: any)
 	for _, player in Players:GetPlayers() do
-		if player:GetAttribute("Room") == g.world.id then
+		if player:GetAttribute("RoomKey") == g.key then
 			remote():FireClient(player, ...)
 		end
 	end
@@ -252,8 +254,8 @@ local function startAttack(g: Golem, name: string)
 	g.lastAttack = name
 	g.attackId += 1
 	local id = g.attackId
-	play(g, name)
-	local events = (Anims.clips :: any)[name].events
+	play(g, Experiment.clipFor(name)) -- EXPERIMENTO: o Slam pode tocar o clip SlamV2
+	local events = (Anims.clips :: any)[g.clip].events
 	local at = events.impact or events.pulse
 	task.delay(at, function()
 		if g.attackId == id and g.state == "attack" then
@@ -322,7 +324,7 @@ local function die(g: Golem)
 	-- o sorteio vem depois de ele se desfazer
 	task.delay(event("Death", "crumble") + 1.4, function()
 		for _, player in Players:GetPlayers() do
-			if player:GetAttribute("Room") == g.world.id and Boss.onVictory then
+			if player:GetAttribute("RoomKey") == g.key and Boss.onVictory then
 				(Boss.onVictory :: any)(player)
 			end
 		end
@@ -371,7 +373,7 @@ local function step(g: Golem, dt: number)
 	if g.state == "attack" then
 		local name = g.attack :: string
 		local elapsed = t - g.started
-		local events = (Anims.clips :: any)[name].events
+		local events = (Anims.clips :: any)[g.clip].events
 		local hitAt = events.impact or events.pulse
 		-- acompanha o alvo durante a preparação e trava antes do golpe (dá para esquivar)
 		if elapsed < hitAt * 0.6 then
@@ -383,7 +385,7 @@ local function step(g: Golem, dt: number)
 			move(g, speed * dt)
 		end
 		place(g)
-		if elapsed >= length(name) then
+		if elapsed >= length(g.clip) then
 			g.attack = nil
 			setState(g, "idle")
 			play(g, "Idle")
@@ -431,7 +433,7 @@ end
 ---------------------------------------------------------------------------------------------------
 
 -- Monta o golem de uma sala (chamado pelo BossRoom depois de montar a sala).
-function Boss.build(world: any, folder: Folder, center: Vector3, prompt: ProximityPrompt?)
+function Boss.build(world: any, folder: Folder, center: Vector3, prompt: ProximityPrompt?, key: string)
 	local model = Instance.new("Model")
 	model.Name = "Boss"
 	model.ModelStreamingMode = Enum.ModelStreamingMode.Persistent -- o cliente sempre sabe onde ele está
@@ -459,6 +461,7 @@ function Boss.build(world: any, folder: Folder, center: Vector3, prompt: Proximi
 	model.PrimaryPart = root
 
 	local g: Golem = {
+		key = key,
 		world = world,
 		center = center,
 		model = model,
@@ -480,7 +483,7 @@ function Boss.build(world: any, folder: Folder, center: Vector3, prompt: Proximi
 		emptySince = nil,
 		deadAt = 0,
 	}
-	golems[world.id] = g
+	golems[key] = g
 	reset(g)
 	model.Parent = folder
 end
@@ -492,7 +495,7 @@ end
 
 -- Desafio no círculo: acorda o golem. A luta começa quando ele termina de levantar.
 function Boss.challenge(player: Player, allowed: boolean): boolean
-	local g = golems[player:GetAttribute("Room") :: number]
+	local g = golems[player:GetAttribute("RoomKey") :: string]
 	if not g or g.state ~= "sleep" or not allowed then
 		return false
 	end
@@ -506,7 +509,7 @@ function Boss.challenge(player: Player, allowed: boolean): boolean
 	if g.prompt then
 		g.prompt.Enabled = false
 	end
-	toRoom(g, "intro", g.world.id)
+	toRoom(g, "intro", g.key)
 	local started = g.started
 	task.delay(length("Wake"), function()
 		if g.state == "wake" and g.started == started then
@@ -520,7 +523,7 @@ end
 
 -- Soco do jogador no golem. Devolve o dano (0 se não contou).
 function Boss.punch(player: Player, forceCrit: boolean?): number
-	local g = golems[player:GetAttribute("Room") :: number]
+	local g = golems[player:GetAttribute("RoomKey") :: string]
 	if not g or g.state == "sleep" or g.state == "wake" or g.state == "dead" then
 		return 0
 	end
@@ -562,17 +565,29 @@ function Boss.start()
 	end)
 end
 
--- Para os testes (src/server/tests/golem.luau).
-function Boss.debug(worldId: number): { [string]: any }?
-	local g = golems[worldId]
+local function find(room: string | number): Golem?
+	return golems[if type(room) == "number" then "BossRoom" .. room else room]
+end
+
+-- Volta o golem de uma sala a dormir (a sala ficou sem dono).
+function Boss.reset(key: string)
+	local g = golems[key]
+	if g then
+		reset(g)
+	end
+end
+
+-- Para os testes (src/server/tests/golem.luau): a sala pelo nome ou o número do mundo.
+function Boss.debug(room: string | number): { [string]: any }?
+	local g = find(room)
 	if not g then
 		return nil
 	end
 	return { state = g.state, clip = g.clip, hp = g.hp, maxHp = g.maxHp, rage = g.rage, position = g.position, cframe = cframe(g), attack = g.attack }
 end
 
-function Boss.test(worldId: number, action: string, arg: any): any
-	local g = golems[worldId]
+function Boss.test(room: string | number, action: string, arg: any): any
+	local g = find(room)
 	if not g then
 		return nil
 	end

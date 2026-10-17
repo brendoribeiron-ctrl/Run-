@@ -101,9 +101,15 @@ local function play(seconds: number, step: (number) -> ())
 	end
 end
 
-local function roomOf(world: any): Folder?
-	local found = workspace:FindFirstChild("BossRoom" .. world.id)
-	return if found and found:IsA("Folder") then found else nil
+-- A sala do jogador (o servidor dá uma para cada um, atributo RoomKey) e o centro do piso dela.
+local function myRoom(): (Folder?, Vector3?)
+	local key = player:GetAttribute("RoomKey")
+	local found = if type(key) == "string" then workspace:FindFirstChild(key) else nil
+	local center = found and found:GetAttribute("Center")
+	if found and found:IsA("Folder") and typeof(center) == "Vector3" then
+		return found, center
+	end
+	return nil, nil
 end
 
 ---------------------------------------------------------------------------------------------------
@@ -271,9 +277,8 @@ end
 ---------------------------------------------------------------------------------------------------
 -- 3. Cinemática dentro da sala
 
-local function intro(root: BasePart, world: any, room: Folder)
+local function intro(root: BasePart, world: any, room: Folder, center: Vector3)
 	phase = "intro"
-	local center = ROOM.center + world.offset
 	local entry = root.Position
 	local color = GLOW[world.id] or GLOW[1]
 	local list = leaves(room, center)
@@ -347,20 +352,25 @@ function BossRoom.enter(root: BasePart, humanoid: Humanoid, world: any)
 	root.Anchored = false
 	humanoid.PlatformStand = false
 	root.AssemblyLinearVelocity = Vector3.zero
-	local entry = ROOM.center + world.offset + Vector3.new(0, 3, ROOM.entry * K)
-	local deadline = os.clock() + 6
-	while os.clock() < deadline and (root.Position - entry).Magnitude > 25 do
+	-- (uma sala nova pode levar um instante para ser montada no servidor)
+	local deadline = os.clock() + 10
+	local room, center = nil, nil
+	local arrived = false
+	while os.clock() < deadline do
+		room, center = myRoom()
+		if center and (root.Position - (center + Vector3.new(0, 3, ROOM.entry * K))).Magnitude <= 25 then
+			arrived = true
+			break
+		end
 		task.wait(0.05)
 	end
-	local room = roomOf(world)
-	local arrived = (root.Position - entry).Magnitude <= 25
-	if arrived and room then
+	if arrived and room and center then
 		-- espera as portas chegarem (o mapa é carregado aos poucos)
 		local model = room:WaitForChild("boss_room", 2)
 		if model then
 			model:WaitForChild("DoorR_boss_room", 2)
 		end
-		intro(root, world, room)
+		intro(root, world, room, center)
 	else
 		Fx.black(0, 0.3)
 		camera.CameraType = Enum.CameraType.Custom

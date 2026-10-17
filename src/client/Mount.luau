@@ -1,5 +1,6 @@
 --!strict
--- Montarias: mostra, embaixo de cada jogador, a montaria que ele equipou (atributo "Mount").
+-- Montarias: mostra, embaixo de cada jogador, a montaria que ele escolheu (atributo "Mount")
+-- quando ele está montado (atributo "Riding", ligado e desligado na tecla M ou no botão RIDE).
 -- É só visual: o modelo acompanha o boneco, flutua, costura de um lado para o outro, inclina
 -- nas curvas e, no tapete, os gomos ondulam. No pulo, o skate dá um kickflip e o tapete empina.
 -- No jogador local, o boneco sobe um pouco (HipHeight) e ganha uma pose animada a cada quadro:
@@ -11,10 +12,12 @@
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
 
 local Config = require(ReplicatedStorage.Shared.Config)
 local Pose = require(script.Parent.Pose)
 local Run = require(script.Parent.Run)
+local Ui = require(script.Parent.Ui)
 
 local localPlayer = Players.LocalPlayer
 local MOUNT = Config.Mount
@@ -54,8 +57,9 @@ end
 
 local function equip(player: Player)
 	clear(player)
+	-- "Mount" é a escolhida no menu; "Riding" diz se está em cima dela (tecla M)
 	local id = player:GetAttribute("Mount")
-	local info = if type(id) == "string" then Config.MountById[id] else nil
+	local info = if type(id) == "string" and player:GetAttribute("Riding") == true then Config.MountById[id] else nil
 	local folder = ReplicatedStorage:FindFirstChild("Mounts")
 	local template = info and folder and folder:FindFirstChild(info.id)
 	if not info or not template or not template:IsA("Model") then
@@ -289,10 +293,56 @@ local function update(player: Player, ride: Ride, now: number)
 end
 
 local function watch(player: Player)
-	player:GetAttributeChangedSignal("Mount"):Connect(function()
-		equip(player)
-	end)
+	for _, name in { "Mount", "Riding" } do
+		player:GetAttributeChangedSignal(name):Connect(function()
+			equip(player)
+		end)
+	end
 	equip(player)
+end
+
+-- Sobe ou desce da montaria escolhida (o servidor decide e marca "Riding").
+local function ride()
+	local remote = ReplicatedStorage:FindFirstChild("Remotes") and ReplicatedStorage.Remotes:FindFirstChild("Mount")
+	if remote and remote:IsA("RemoteEvent") then
+		remote:FireServer("ride")
+	end
+end
+Mount.ride = ride
+
+-- No celular: botão RIDE acima do DASH, só com uma montaria escolhida.
+local function touchButton()
+	if not UserInputService.TouchEnabled then
+		return
+	end
+	local gui = Instance.new("ScreenGui")
+	gui.Name = "RideButton"
+	gui.ResetOnSpawn = false
+	gui.DisplayOrder = 12
+	local button = Instance.new("TextButton")
+	button.Name = "RideButton"
+	button.AnchorPoint = Vector2.new(1, 1)
+	button.Position = UDim2.new(1, -110, 1, -194)
+	button.Size = UDim2.fromOffset(64, 64)
+	button.BackgroundColor3 = Color3.fromRGB(30, 34, 54)
+	button.BackgroundTransparency = 0.25
+	button.Font = Enum.Font.FredokaOne
+	button.TextSize = 18
+	button.TextColor3 = Color3.new(1, 1, 1)
+	Ui.corner(button, 32)
+	Ui.border(button, 3)
+	Ui.stroke(button, 2)
+	button.Activated:Connect(ride)
+	button.Parent = gui
+	local function refresh()
+		local id = localPlayer:GetAttribute("Mount")
+		button.Visible = type(id) == "string" and id ~= ""
+		button.Text = if localPlayer:GetAttribute("Riding") == true then "OFF" else "RIDE"
+	end
+	localPlayer:GetAttributeChangedSignal("Mount"):Connect(refresh)
+	localPlayer:GetAttributeChangedSignal("Riding"):Connect(refresh)
+	refresh()
+	gui.Parent = localPlayer:WaitForChild("PlayerGui")
 end
 
 -- Estado da montaria do jogador local; usado pelos testes.
@@ -320,6 +370,12 @@ function Mount.start()
 	for _, info in Config.Mounts do
 		Pose.define("mount_" .. info.id, {}, false, 10)
 	end
+	UserInputService.InputBegan:Connect(function(input, processed)
+		if not processed and input.KeyCode == Enum.KeyCode.M then
+			ride()
+		end
+	end)
+	touchButton()
 
 	task.spawn(function()
 		-- os modelos chegam quando o servidor termina de carregar

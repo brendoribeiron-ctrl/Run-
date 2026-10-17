@@ -114,6 +114,14 @@ local saved = HudLayout.decode(hook:Invoke("state", player).hud)
 check("layout salvo no perfil", saved.Hotbar and saved.Hotbar.s == 1.3 and saved.Hotbar.o == 0.5, tostring(hook:Invoke("state", player).hud))
 check("atributo atualizado", player:GetAttribute("HudLayout") == hook:Invoke("state", player).hud, "")
 
+-- mesma conta no PC: layout do celular não vale lá
+ui("hudPlatform", "desktop")
+local pc = ui("hudState")
+check("PC ignora layout do celular", math.abs(pc.Hotbar.x - before.x) < 1e-3 and pc.Hotbar.userScale == 1 and pc.Hotbar.opacity == 1, `{pc.Hotbar.x} {pc.Hotbar.userScale} {pc.Hotbar.opacity}`)
+ui("hudPlatform", "phone")
+local back = ui("hudState")
+check("celular volta ao layout salvo", back.Hotbar.userScale == 1.3, tostring(back.Hotbar.userScale))
+
 -- volta ao padrão
 local reset = ui("hudSet", { id = "Hotbar", entry = HudLayout.default() })
 check("reset volta a hotbar", math.abs(reset.Hotbar.x - before.x) < 1e-3 and reset.Hotbar.userScale == 1 and reset.Hotbar.opacity == 1, `{reset.Hotbar.x} {reset.Hotbar.userScale} {reset.Hotbar.opacity}`)

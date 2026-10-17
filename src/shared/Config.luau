@@ -322,11 +322,12 @@ Config.Wizard = {
 }
 
 -- Sala do chefe (src/server/BossRoom.luau; modelo em tools/blender/boss_room.py): a rotunda
--- para onde vai quem limpa o corredor inteiro. Cada mundo tem a sua, em center + offset do
--- mundo: longe e no alto, fora do alcance de quem está no mapa. As medidas abaixo são as do
+-- para onde vai quem limpa o corredor inteiro. Cada jogador tem a sua cópia (com o seu golem),
+-- em center + offset do mundo + n * spacing: longe e no alto, fora do alcance de quem está no mapa. As medidas abaixo são as do
 -- modelo; no jogo tudo é multiplicado por scale.
 Config.BossRoom = {
-	center = Vector3.new(0, 1200, -700), -- centro do piso
+	center = Vector3.new(0, 1200, -700), -- centro do piso (da primeira sala do mundo)
+	spacing = 400, -- cada jogador luta na sua cópia da sala: a cópia n fica n * spacing em +X
 	scale = 2, -- tamanho da sala no jogo, em vezes o do modelo do Blender
 	radius = 64, -- até a face de dentro da parede
 	wallHeight = 60,
@@ -370,17 +371,31 @@ Config.Boss = {
 		Pulse = { damage = 30, ahead = 8, side = -7, speed = 52, reach = 72, height = 5, weight = 2 },
 		Charge = { damage = 34, radius = 12, ahead = 8, lunge = 9 },
 	},
+	-- EXPERIMENTOS (src/shared/GolemExperiment.luau): golpes com animação nova
+	-- (tools/blender/golem_v2.py) e efeitos novos (src/client/BossFx<Clip>.luau). false = volta ao
+	-- golpe original. Dano, raio e alcance continuam os de attacks; só muda o tempo até o impacto.
+	slamV2 = true, -- Esmagamento de Punhos: impacto em 1,10 s (era 1,03 s)
+	chargeV2 = true, -- gancho da corrida: impacto em 0,60 s (era 0,57 s)
 }
 
 -- Modelos de Shared.Assets que não são cenário espalhado (cada um tem o próprio módulo).
 Config.StructureAssets = { golem = true, boss_fx = true, boss_room = true, sanctum = true, potion_shop = true, wizard = true, volcano_terrace = true, volcano_base = true, volcano_track = true, volcano_mount = true, volcano_spire = true }
 
--- Sorteio: pesos em relação ao tier da última parede quebrada.
+-- Sorteio do fim da corrida (Run.rollCharacter). Chegar na parede de uma raridade NÃO garante
+-- ela: só deixa as raras um pouco mais prováveis. Peso de cada raridade (Common, Uncommon, Rare,
+-- Epic, Legendary, Mythic) pelo tier da última parede quebrada; Mítico fica raro até no fim.
+-- A sorte (a 2ª parede do tier vale um pouco mais; poção de sorte) multiplica do Raro para cima.
 Config.Roll = {
-	sameWeight = 60,
-	lowerWeight = 30,
-	higherWeight = 10, -- multiplicado pela sorte da parede, até higherCap
-	higherCap = 50,
+	odds = {
+		{ 75, 22, 3, 0, 0, 0 },
+		{ 50, 38, 11, 1, 0, 0 },
+		{ 32, 40, 23, 4.5, 0.5, 0 },
+		{ 20, 36, 31, 11, 1.8, 0.2 },
+		{ 12, 30, 35, 17, 5.5, 0.5 },
+		{ 8, 24, 36, 22, 8.8, 1.2 },
+	},
+	luckFrom = 3, -- primeira raridade que a sorte multiplica (Rare)
+	wallLuckPower = 0.5, -- quanto a sorte da parede pesa dentro do tier (raiz da razão)
 }
 
 Config.Inventory = {

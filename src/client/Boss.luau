@@ -16,6 +16,7 @@ local TweenService = game:GetService("TweenService")
 
 local Anims = require(ReplicatedStorage.Shared.GolemAnims)
 local Config = require(ReplicatedStorage.Shared.Config)
+require(ReplicatedStorage.Shared.GolemExperiment) -- EXPERIMENTO: põe o clip SlamV2 em GolemAnims (Config.Boss.slamV2)
 local Bag = require(script.Parent.Bag)
 local BossFx = require(script.Parent.BossFx)
 local BossRoom = require(script.Parent.BossRoom)
@@ -68,7 +69,13 @@ type Rig = {
 	stepAt: number,
 }
 
-local rigs: { [number]: Rig } = {}
+-- um por sala (pelo nome dela); só o da sala do jogador anima e aparece
+local rigs: { [string]: Rig } = {}
+
+local function myRig(): Rig?
+	local key = player:GetAttribute("RoomKey")
+	return if type(key) == "string" then rigs[key] else nil
+end
 
 local function serverTime(): number
 	return workspace:GetServerTimeNow()
@@ -328,8 +335,7 @@ local function makeBar()
 end
 
 local function updateBar()
-	local room = player:GetAttribute("Room")
-	local rig = if type(room) == "number" then rigs[room] else nil
+	local rig = myRig()
 	local holder = bar
 	if not holder or not fill or not chip or not title then
 		return
@@ -362,8 +368,8 @@ end
 ---------------------------------------------------------------------------------------------------
 -- Cena do despertar: câmera baixa no rosto, ele levanta, ruge, nome do chefe
 
-local function intro(worldId: number)
-	local rig = rigs[worldId]
+local function intro(key: string)
+	local rig = rigs[key]
 	local character = player.Character
 	local root = character and character:FindFirstChild("HumanoidRootPart")
 	if not rig or not root or not root:IsA("BasePart") then
@@ -407,8 +413,8 @@ local function intro(worldId: number)
 			camera.FieldOfView = 62 + 8 * u
 			if not titled and t > 3.6 then
 				titled = true
-				Fx.title(rig.server:GetAttribute("Name") :: string? or "BOSS", GLOW[worldId] or GLOW[1], 1.4)
-				Fx.flash(GLOW[worldId] or GLOW[1], 0.35, 0.4)
+				Fx.title(rig.server:GetAttribute("Name") :: string? or "BOSS", GLOW[rig.world] or GLOW[1], 1.4)
+				Fx.flash(GLOW[rig.world] or GLOW[1], 0.35, 0.4)
 			end
 		end
 		camera.CFrame = CFrame.lookAt(eye, look) * Fx.shakeCFrame()
@@ -450,8 +456,7 @@ end
 
 -- Centro do golem para o soco, se o jogador estiver perto o bastante dele.
 local function punchTarget(): Vector3?
-	local room = player:GetAttribute("Room")
-	local rig = if type(room) == "number" then rigs[room] else nil
+	local rig = myRig()
 	local character = player.Character
 	local root = character and character:FindFirstChild("HumanoidRootPart")
 	if not rig or not rig.cf or not fightable(rig) or not root or not root:IsA("BasePart") then
@@ -472,14 +477,14 @@ function Boss.start()
 	local bossHit = remotes:WaitForChild("BossHit") :: RemoteEvent
 
 	local function watch(folder: Instance)
-		if not folder:IsA("Folder") or not string.match(folder.Name, "^BossRoom%d+$") then
+		if not folder:IsA("Folder") or not string.match(folder.Name, "^BossRoom%d+_?%d*$") then
 			return
 		end
 		task.spawn(function()
 			local server = folder:WaitForChild("Boss", 60)
 			local world = folder:GetAttribute("World")
 			if server and server:IsA("Model") and type(world) == "number" then
-				rigs[world] = {
+				rigs[folder.Name] = {
 					world = world,
 					server = server,
 					model = nil,
@@ -510,8 +515,13 @@ function Boss.start()
 	workspace.ChildAdded:Connect(watch)
 
 	RunService.RenderStepped:Connect(function(dt)
+		local mine = myRig()
 		for _, rig in rigs do
-			update(rig, dt)
+			if rig == mine then
+				update(rig, dt)
+			elseif rig.model and rig.model.Parent then
+				rig.model.Parent = nil
+			end
 		end
 		updateBar()
 	end)
@@ -522,8 +532,7 @@ function Boss.start()
 		elseif kind == "hit" then
 			onHit(a, b)
 		elseif kind == "hurt" then
-			local room = player:GetAttribute("Room")
-			local rig = if type(room) == "number" then rigs[room] else nil
+			local rig = myRig()
 			local character = player.Character
 			local root = character and character:FindFirstChild("HumanoidRootPart")
 			if rig and rig.cf and root and root:IsA("BasePart") then
@@ -548,8 +557,7 @@ function Boss.start()
 end
 
 function Boss.debug(): { [string]: any }
-	local room = player:GetAttribute("Room")
-	local rig = if type(room) == "number" then rigs[room] else rigs[1]
+	local rig = myRig() or rigs.BossRoom1
 	if not rig then
 		return { built = false }
 	end

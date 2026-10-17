@@ -1,9 +1,12 @@
 --!strict
 -- Sala do chefe: a rotunda para onde vai quem limpa o corredor inteiro (modelo em
--- tools/blender/boss_room.py). Cada mundo tem a sua, no offset dele, com as cores do mundo: o
--- mesmo modelo, pintado pelo nome das peças. Fica longe e no alto (Config.BossRoom.center), fora
--- do alcance de quem está no mapa. O chefe (src/server/Boss.luau) dorme no círculo mágico do
--- centro; a entrada é encenada pelo cliente e a saída é pela porta.
+-- tools/blender/boss_room.py). Cada jogador luta sozinho, na sua cópia da sala (com o seu golem):
+-- as cópias de um mundo ficam em fila (Config.BossRoom.spacing), nascem quando faltam e são
+-- reaproveitadas quando o dono sai. A primeira ("BossRoom<mundo>") é montada ao abrir o servidor;
+-- as outras se chamam "BossRoom<mundo>_<n>". O jogador sabe qual é a dele pelo atributo RoomKey.
+-- Todas com as cores do mundo: o mesmo modelo, pintado pelo nome das peças. Ficam longe e no alto
+-- (Config.BossRoom.center), fora do alcance de quem está no mapa. O chefe (src/server/Boss.luau)
+-- dorme no círculo mágico do centro; a entrada é encenada pelo cliente e a saída é pela porta.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -19,6 +22,13 @@ local BossRoom = {}
 
 -- Personagem a sortear para quem limpou o corredor e ainda não enfrentou o chefe.
 local pending: { [Player]: boolean } = {}
+
+-- Uma cópia da sala. ready = já montada; owner = quem está lutando nela.
+type Slot = { key: string, world: any, index: number, center: Vector3, ready: boolean, owner: Player? }
+local slots: { [number]: { Slot } } = {} -- por mundo
+local owned: { [Player]: Slot } = {}
+-- Modelo da sala de cada mundo já pintado (só é baixado uma vez; as cópias são clones dele).
+local templates: { [number]: Model } = {}
 -- Quem sorteia e entrega o personagem (Run.reward, ligado pelo init do servidor).
 BossRoom.rewarder = nil :: ((Player) -> (string?, boolean))?
 
@@ -83,14 +93,13 @@ local function part(parent: Instance, name: string, size: Vector3, cframe: CFram
 	return p
 end
 
--- Centro do piso da sala de um mundo.
-function BossRoom.center(world: any): Vector3
-	return ROOM.center + world.offset
+-- Centro do piso da cópia `index` da sala de um mundo.
+local function centerOf(world: any, index: number): Vector3
+	return ROOM.center + world.offset + Vector3.new(index * ROOM.spacing, 0, 0)
 end
 
 -- Onde o jogador aparece: perto da porta, olhando para o círculo do centro.
-function BossRoom.entryCFrame(world: any): CFrame
-	local center = BossRoom.center(world)
+local function entryCFrame(center: Vector3): CFrame
 	local at = center + Vector3.new(0, 3, ROOM.entry * K)
 	return CFrame.lookAt(at, Vector3.new(center.X, at.Y, center.Z))
 end
@@ -205,16 +214,21 @@ local function lights(folder: Instance, center: Vector3, world: any)
 	end
 end
 
--- Monta a sala de um mundo. Devolve a pasta (ou nil se o modelo não carregou).
-local function build(world: any): Folder?
-	local center = BossRoom.center(world)
+-- Monta uma cópia da sala.
+local function build(slot: Slot)
+	local world, center = slot.world, slot.center
 	local folder = Instance.new("Folder")
-	folder.Name = "BossRoom" .. world.id
+	folder.Name = slot.key
 	folder:SetAttribute("World", world.id)
+	folder:SetAttribute("Slot", slot.index)
 	folder:SetAttribute("Center", center)
 	colliders(folder, center)
 	lights(folder, center, world)
-	local model = Models.load("boss_room", STYLES[world.id] or ARCANE)
+	if not templates[world.id] then
+		templates[world.id] = Models.load("boss_room", STYLES[world.id] or ARCANE)
+	end
+	local template = templates[world.id]
+	local model = if template then template:Clone() else nil
 	if model then
 		model:ScaleTo(model:GetScale() * K)
 		model:PivotTo(CFrame.new(center))
@@ -273,8 +287,62 @@ local function build(world: any): Folder?
 	end)
 
 	folder.Parent = workspace
-	Boss.build(world, folder, center, challenge)
-	return folder
+	Boss.build(world, folder, center, challenge, slot.key)
+	slot.ready = true
+end
+
+-- Cria (e começa a montar) a próxima cópia da sala de um mundo.
+local function newSlot(world: any): Slot
+	local list = slots[world.id]
+	local index = #list
+	local slot: Slot = {
+		key = "BossRoom" .. world.id .. (if index > 0 then "_" .. index else ""),
+		world = world,
+		index = index,
+		center = centerOf(world, index),
+		ready = false,
+		owner = nil,
+	}
+	table.insert(list, slot)
+	task.spawn(build, slot)
+	return slot
+end
+
+-- A sala do jogador neste mundo: a que ele já tem, uma livre ou uma nova. Espera ela ficar pronta.
+local function acquire(player: Player, world: any): Slot?
+	local slot = owned[player]
+	if slot and slot.world ~= world then
+		BossRoom.release(player)
+		slot = nil
+	end
+	if not slot then
+		for _, free in slots[world.id] do
+			if free.owner == nil then
+				slot = free
+				break
+			end
+		end
+		slot = slot or newSlot(world)
+		local mine = slot :: Slot
+		mine.owner = player
+		owned[player] = mine
+	end
+	local deadline = os.clock() + 10
+	while not (slot :: Slot).ready and os.clock() < deadline do
+		task.wait(0.05)
+	end
+	return if (slot :: Slot).ready then slot else nil
+end
+
+-- Devolve a sala do jogador (saiu, morreu, viajou): o golem volta a dormir para o próximo dono.
+function BossRoom.release(player: Player)
+	local slot = owned[player]
+	owned[player] = nil
+	player:SetAttribute("RoomKey", nil)
+	if slot and slot.owner == player then
+		slot.owner = nil
+		Boss.reset(slot.key)
+	end
 end
 
 function BossRoom.build()
@@ -287,22 +355,27 @@ function BossRoom.build()
 	Boss.loadModels()
 	Boss.start()
 	for _, world in Config.Worlds do
-		task.spawn(build, world)
+		slots[world.id] = {}
+		newSlot(world)
 	end
 end
 
--- Leva o jogador para a sala do mundo em que ele está.
+-- Leva o jogador para a sala dele no mundo em que ele está.
 function BossRoom.enter(player: Player)
 	local character = player.Character
 	local world = State.world(player)
 	if not character then
 		return
 	end
-	local target = BossRoom.entryCFrame(world)
+	local slot = acquire(player, world)
+	if not slot or player.Character ~= character then
+		return
+	end
+	local target = entryCFrame(slot.center)
 	pcall(function()
 		player:RequestStreamAroundAsync(target.Position, 3)
 	end)
-	if player.Character ~= character then
+	if player.Character ~= character or owned[player] ~= slot then
 		return
 	end
 	local root = character:FindFirstChild("HumanoidRootPart")
@@ -310,6 +383,7 @@ function BossRoom.enter(player: Player)
 		root.AssemblyLinearVelocity = Vector3.zero
 		root.AssemblyAngularVelocity = Vector3.zero
 	end
+	player:SetAttribute("RoomKey", slot.key)
 	player:SetAttribute("Room", world.id)
 	character:PivotTo(target)
 end
@@ -352,16 +426,23 @@ function BossRoom.leave(player: Player): boolean
 	return true
 end
 
--- Quem sai da sala por outro caminho (botão CORRER, viagem, morte) deixa de estar nela.
+-- Quem sai da sala por outro caminho (botão CORRER, viagem, morte) deixa de estar nela e a
+-- sala fica livre.
 function BossRoom.connect()
 	local function watch(player: Player)
 		player.CharacterAdded:Connect(function()
 			player:SetAttribute("Room", nil)
 		end)
+		player:GetAttributeChangedSignal("Room"):Connect(function()
+			if player:GetAttribute("Room") == nil and owned[player] then
+				BossRoom.release(player)
+			end
+		end)
 	end
 	Players.PlayerAdded:Connect(watch)
 	Players.PlayerRemoving:Connect(function(player)
 		pending[player] = nil
+		BossRoom.release(player)
 	end)
 	for _, player in Players:GetPlayers() do
 		watch(player)

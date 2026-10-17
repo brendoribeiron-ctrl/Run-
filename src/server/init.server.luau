@@ -244,8 +244,9 @@ local function equipAura(player: Player, id: any): boolean
 	return true
 end
 
--- Montarias: o primeiro clique compra (uma vez, com dinheiro), os seguintes equipam; clicar na
--- que já está equipada desce dela. Devolve "bought", "on" ou "off".
+-- Montarias: no menu, o primeiro clique compra (uma vez, com dinheiro, e já sobe nela) e os
+-- seguintes só escolhem qual usar. Subir e descer é na tecla M (rideMount), atributo "Riding".
+-- Devolve "bought", "selected" ou nil.
 local function useMount(player: Player, id: any): string?
 	local profile = PlayerData.get(player)
 	local info = if type(id) == "string" then Config.MountById[id] else nil
@@ -253,10 +254,7 @@ local function useMount(player: Player, id: any): string?
 		return nil
 	end
 	if profile.mount == info.id then
-		PlayerData.update(player, function(p)
-			p.mount = ""
-		end)
-		return "off"
+		return "selected"
 	end
 	local bought = false
 	if not profile.mounts[info.id] then
@@ -273,7 +271,23 @@ local function useMount(player: Player, id: any): string?
 		end
 		p.mount = info.id
 	end)
-	return if bought then "bought" else "on"
+	if bought then
+		player:SetAttribute("Riding", true)
+	end
+	return if bought then "bought" else "selected"
+end
+
+-- Tecla M: sobe na montaria escolhida ou desce dela. Devolve se ficou montado (nil sem montaria).
+local function rideMount(player: Player): boolean?
+	local profile = PlayerData.get(player)
+	if not profile or profile.mount == "" then
+		player:SetAttribute("Riding", nil)
+		State.remotes.Fx:FireClient(player, "toast", "Pick a mount in MOUNTS first!")
+		return nil
+	end
+	local on = player:GetAttribute("Riding") ~= true
+	player:SetAttribute("Riding", if on then true else nil)
+	return on
 end
 
 -- Mochila: leva o personagem da posição `from` para o slot rápido `slot`, trocando de lugar
@@ -728,7 +742,14 @@ end)
 Players.PlayerRemoving:Connect(function(player)
 	lastHudSave[player] = nil
 end)
-remotes.Mount.OnServerEvent:Connect(useMount)
+-- Mount: C->S id da montaria (menu) | "ride" (tecla M, sobe/desce)
+remotes.Mount.OnServerEvent:Connect(function(player, id)
+	if id == "ride" then
+		rideMount(player)
+	else
+		useMount(player, id)
+	end
+end)
 remotes.Sell.OnServerEvent:Connect(sellCharacter)
 
 -- Progressão (src/server/Progress.luau)
@@ -1166,7 +1187,7 @@ if RunService:IsStudio() then
 			return BossRoom.victory(player)
 		elseif command == "boss" then
 			-- value = { action, arg }: estado e controle do golem da sala em que o jogador está
-			local room = player:GetAttribute("Room") or value.world or 1
+			local room = player:GetAttribute("RoomKey") or value.world or 1
 			if value.action == "state" then
 				return Boss.debug(room)
 			elseif value.action == "challenge" then
@@ -1184,6 +1205,8 @@ if RunService:IsStudio() then
 			return Pedestals.interact(player, value)
 		elseif command == "mount" then
 			return useMount(player, value)
+		elseif command == "ride" then
+			return rideMount(player)
 		elseif command == "collect" then
 			return Pedestals.collect(player)
 		elseif command == "fighterUp" then

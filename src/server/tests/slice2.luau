@@ -77,14 +77,22 @@ check("carga abaixo do mínimo cancela", hook:Invoke("runRelease", player, 0.05)
 check("cancelar libera nova carga", hook:Invoke("runStart", player) == true, "depois do cancelamento")
 hook:Invoke("runFinish", player)
 
--- sorteio: parede Epic só dá Rare, Epic ou Legendary
-local seen = {}
-for _ = 1, 400 do
-	local rarity = Config.CharacterById[hook:Invoke("roll", player, 8)].rarity
-	seen[rarity] = (seen[rarity] or 0) + 1
+-- sorteio: chegar na parede Epic não garante Epic; ele continua raro e Mítico mais ainda
+local function rolls(wall: number, count: number): { [number]: number }
+	local seen = {}
+	for _ = 1, count do
+		local rarity = Config.CharacterById[hook:Invoke("roll", player, wall)].rarity
+		seen[rarity] = (seen[rarity] or 0) + 1
+	end
+	return seen
 end
-check("sorteio respeita o tier da parede", seen[3] and seen[4] and seen[5] and not seen[1] and not seen[2] and not seen[6], "raridades fora da faixa")
-check("a raridade da parede é a mais comum", seen[4] > seen[3] and seen[4] > seen[5], `R{seen[3]} E{seen[4]} L{seen[5]}`)
+local epic = rolls(8, 1000)
+check("parede Epic: Epic é minoria", (epic[4] or 0) > 40 and (epic[4] or 0) < 200, `E{epic[4]}`)
+check("parede Epic: comuns ainda saem", (epic[1] or 0) > 100 and (epic[2] or 0) > 200, `C{epic[1]} U{epic[2]}`)
+local last = rolls(#Config.Walls, 1000)
+check("última parede: Mítico raro", (last[6] or 0) < 40, `M{last[6]}`)
+check("mais longe = mais chance de raro", (last[4] or 0) + (last[5] or 0) > (epic[4] or 0) + (epic[5] or 0), "")
+check("sem parede só comum", rolls(0, 50)[1] == 50, "")
 
 -- pedestais e renda
 reset(0)
