@@ -9,6 +9,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 
+local Animations = require(ReplicatedStorage.Shared.Animations)
 local Config = require(ReplicatedStorage.Shared.Config)
 local Aura = require(script.Parent.Aura)
 local Fx = require(script.Parent.Fx)
@@ -175,20 +176,33 @@ local function doubleJump()
 	Fx.shake(0.15)
 end
 
--- Troca a caminhada padrão pelo asset de Config.Move.walkAnimationId. No Animate atual a
--- caminhada mistura "walk" e "run" pela velocidade, então os dois recebem o mesmo asset
--- (a corrida de verdade é a camada "sprint", que cobre os dois).
+-- Troca animações padrão do Animate por assets nossos:
+--   caminhada: Config.Move.walkAnimationId. No Animate atual a caminhada mistura "walk" e "run"
+--   pela velocidade, então os dois recebem o mesmo asset (a corrida de verdade é a camada
+--   "sprint", que cobre os dois).
+--   parado: a animação de descanso (tools/anim/rest_idle.luau, Shared.Animations.rest_idle) nos
+--   dois sorteios do idle (o padrão alterna entre eles).
 local CUSTOM_WALK = MOVE.walkAnimationId ~= ""
-local function applyWalkAnimation(character: Model)
+local REST_IDLE = Animations.rest_idle or ""
+local function applyAnimations(character: Model)
 	local animate = character:WaitForChild("Animate", 10)
 	if not animate then
 		return
 	end
-	for holderName, animationName in { walk = "WalkAnim", run = "RunAnim" } do
-		local holder = animate:WaitForChild(holderName, 5)
-		local animation = holder and holder:FindFirstChild(animationName)
+	local swaps: { { string } } = {}
+	if CUSTOM_WALK then
+		table.insert(swaps, { "walk", "WalkAnim", MOVE.walkAnimationId })
+		table.insert(swaps, { "run", "RunAnim", MOVE.walkAnimationId })
+	end
+	if REST_IDLE ~= "" then
+		table.insert(swaps, { "idle", "Animation1", REST_IDLE })
+		table.insert(swaps, { "idle", "Animation2", REST_IDLE })
+	end
+	for _, swap in swaps do
+		local holder = animate:WaitForChild(swap[1], 5)
+		local animation = holder and holder:FindFirstChild(swap[2])
 		if animation and animation:IsA("Animation") then
-			animation.AnimationId = MOVE.walkAnimationId
+			animation.AnimationId = swap[3]
 		end
 	end
 end
@@ -198,9 +212,7 @@ local function onCharacter(character: Model)
 	if not humanoid or not humanoid:IsA("Humanoid") then
 		return
 	end
-	if CUSTOM_WALK then
-		task.spawn(applyWalkAnimation, character)
-	end
+	task.spawn(applyAnimations, character)
 	usedDouble = false
 	humanoid.StateChanged:Connect(function(_, new)
 		if new == Enum.HumanoidStateType.Landed then

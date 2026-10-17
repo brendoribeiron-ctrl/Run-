@@ -1,0 +1,74 @@
+{
+	"bc_asta": {
+		"assetId": "110263980701991",
+		"hash": "382746927f16aaa168d223e76b9f34cfe480551d"
+	},
+	"bc_noelle": {
+		"assetId": "109241374410757",
+		"hash": "1c0788d9683a14cc8450745daca64e4ef97cfb35"
+	},
+	"bc_charmy": {
+		"assetId": "132842731916896",
+		"hash": "af9ff15d805f51293a7616e864e46147c8919479"
+	},
+	"bc_finral": {
+		"assetId": "84904010472345",
+		"hash": "1687e9f9723aff2fabff185d920fec47a0922a9c"
+	},
+	"bc_fuegoleon": {
+		"assetId": "82449306282966",
+		"hash": "6c5af02249be5afb619d8767445ccc26d6f7ba12"
+	},
+	"bc_gauche": {
+		"assetId": "130697171225954",
+		"hash": "4bef28f825fd842900cd5cf8838e9c85569903c1"
+	},
+	"bc_julius": {
+		"assetId": "95011987327347",
+		"hash": "749081449df5ab184837599d5de8ccfca9eba975"
+	},
+	"bc_leopold": {
+		"assetId": "126876323250196",
+		"hash": "5dba923472f10fed2f6b3c0528ac341809c7328a"
+	},
+	"bc_licht": {
+		"assetId": "135539155764818",
+		"hash": "3188533a39811b2b3e483225008a534603c2672b"
+	},
+	"bc_lucius": {
+		"assetId": "93577334930947",
+		"hash": "4a8c8035ab25e2a77bca02371bf9dfedba13c418"
+	},
+	"bc_luck": {
+		"assetId": "113080384995597",
+		"hash": "7f27430b8ab38fdc9cf0f3cc7e83b4573c6f235e"
+	},
+	"bc_magna": {
+		"assetId": "131076805680628",
+		"hash": "7a8df0788ed0eb31ffde1977e75c847914151413"
+	},
+	"bc_mereoleona": {
+		"assetId": "130250358351199",
+		"hash": "117d2a849723928847083590fd651e5665b8c777"
+	},
+	"bc_mimosa": {
+		"assetId": "72646785790873",
+		"hash": "c76e9c9774c33e195b1d56e5f0c9eed615bfd0a6"
+	},
+	"bc_vanessa": {
+		"assetId": "111440501934709",
+		"hash": "5643636597cbeea939f2450dcbb91c1e128e615f"
+	},
+	"bc_yami": {
+		"assetId": "137169417374757",
+		"hash": "2df3e8189b77483ba2072dd64c07d39a7c6ad8d9"
+	},
+	"bc_yuno": {
+		"assetId": "88357468838100",
+		"hash": "a6b9a61f3924771592228ef7617be73ec1aec0f5"
+	},
+	"bc_zora": {
+		"assetId": "94288701655785",
+		"hash": "017c38daf46640eaaeb6c5a5709e94c4546d8f15"
+	}
+}

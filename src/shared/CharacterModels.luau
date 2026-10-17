@@ -1,6 +1,10 @@
 --!strict
--- Lutadores de brinquedo montados com peças, a partir das cores e do chapéu em Config.Characters.
--- O mesmo modelo serve para o pedestal (servidor), a carta e o hotbar (ViewportFrame no cliente).
+-- Modelo de cada personagem: o avatar de anime do catálogo (ReplicatedStorage.CharacterMeshes,
+-- montado pelo servidor a partir de Shared.AnimeCast) ou, enquanto ele não chegou, o lutador de
+-- brinquedo montado com peças a partir das cores e do chapéu em Config.Characters. O mesmo modelo serve para o pedestal
+-- (servidor), a carta e o hotbar (ViewportFrame no cliente).
+
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Config = require(script.Parent.Config)
 
@@ -8,6 +12,10 @@ local CharacterModels = {}
 
 local SKIN = Color3.fromRGB(255, 205, 150)
 local DARK = Color3.fromRGB(20, 20, 28)
+-- variantes: a de magma (mundo 2) fica cor de rocha com brilho de lava; a Shiny puxa para o
+-- dourado. A pele muda pela cor das partes do corpo; os acessórios, pela cor da malha.
+local ASH, GOLD = Color3.fromRGB(70, 44, 40), Color3.fromRGB(255, 205, 60)
+local LAVA_TINT, GOLD_TINT = Vector3.new(1, 0.55, 0.35), Vector3.new(1, 0.9, 0.5)
 
 local function piece(model: Model, name: string, size: Vector3, cframe: CFrame, color: Color3, material: Enum.Material?, shape: Enum.PartType?): Part
 	local p = Instance.new("Part")
@@ -56,13 +64,38 @@ local function addHat(model: Model, hat: string, color: Color3, glow: Enum.Mater
 	end
 end
 
--- Devolve o modelo com os pés na origem e a frente virada para -Z.
-function CharacterModels.build(id: string, scale: number?): Model
-	local info = Config.CharacterById[id]
-	assert(info, "personagem desconhecido: " .. tostring(id))
+local function meshSource(info: any): Model?
+	local holder = ReplicatedStorage:FindFirstChild("CharacterMeshes")
+	local source = if holder and info.model then holder:FindFirstChild(info.model) else nil
+	return if source and source:IsA("Model") then source else nil
+end
 
+-- Cópia do avatar de anime, tingida para a variante.
+local function meshModel(info: any, source: Model): Model
+	local model = source:Clone()
+	for _, d in model:GetDescendants() do
+		if d:IsA("BasePart") and not d:FindFirstAncestorOfClass("Accessory") then
+			if info.world then
+				d.Color = d.Color:Lerp(ASH, 0.6)
+			end
+			if info.shiny then
+				d.Color = d.Color:Lerp(GOLD, 0.35)
+			end
+		elseif d:IsA("SpecialMesh") then
+			if info.world then
+				d.VertexColor = LAVA_TINT
+			end
+			if info.shiny then
+				d.VertexColor = d.VertexColor * GOLD_TINT * 1.15
+			end
+		end
+	end
+	return model
+end
+
+-- Lutador de brinquedo montado com peças.
+local function partModel(info: any): Model
 	local model = Instance.new("Model")
-	model.Name = info.name
 	local glow = if info.rarity >= 4 or info.shiny then Enum.Material.Neon else Enum.Material.SmoothPlastic
 
 	for _, side in { -1, 1 } do
@@ -80,6 +113,18 @@ function CharacterModels.build(id: string, scale: number?): Model
 	end
 	piece(model, "Mouth", Vector3.new(0.5, 0.1, 0.06), CFrame.new(0, 3.72, -0.71), DARK)
 	addHat(model, info.hat, info.glove, glow)
+	return model
+end
+
+-- Devolve o modelo com os pés na origem e a frente virada para -Z.
+function CharacterModels.build(id: string, scale: number?): Model
+	local info = Config.CharacterById[id]
+	assert(info, "personagem desconhecido: " .. tostring(id))
+
+	local source = meshSource(info)
+	local model = if source then meshModel(info, source) else partModel(info)
+	model.Name = info.name
+	model:SetAttribute("Anime", source ~= nil)
 
 	-- Shiny: estrelinhas douradas em volta
 	if info.shiny then
@@ -109,6 +154,16 @@ function CharacterModels.render(viewport: ViewportFrame, id: string)
 	viewport:ClearAllChildren()
 	local model = CharacterModels.build(id)
 	model.Parent = viewport
+	-- o modelo de anime ainda não chegou: troca assim que chegar, se a carta ainda for a mesma
+	local info = Config.CharacterById[id]
+	if not model:GetAttribute("Anime") and info.model then
+		task.spawn(function()
+			local holder = ReplicatedStorage:WaitForChild("CharacterMeshes", 60)
+			if holder and holder:WaitForChild(info.model, 60) and model.Parent == viewport then
+				CharacterModels.render(viewport, id)
+			end
+		end)
+	end
 	local camera = Instance.new("Camera")
 	camera.FieldOfView = 30
 	camera.CFrame = CFrame.lookAt(Vector3.new(-4, 4.2, -11.5), Vector3.new(0, 2.7, 0))

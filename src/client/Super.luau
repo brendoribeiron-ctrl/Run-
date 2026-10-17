@@ -15,6 +15,7 @@ local Config = require(ReplicatedStorage.Shared.Config)
 local Aura = require(script.Parent.Aura)
 local Format = require(ReplicatedStorage.Shared.Format)
 local Fx = require(script.Parent.Fx)
+local Platform = require(script.Parent.Platform)
 local Pose = require(script.Parent.Pose)
 local Ui = require(script.Parent.Ui)
 
@@ -399,8 +400,14 @@ local function build()
 	local pop = Ui.frame(panel, "Pop", UDim2.fromScale(1, 1))
 	panelScale = Instance.new("UIScale")
 	panelScale.Parent = pop
-	Ui.text(pop, { name = "Title", text = "SUPER PUNCH!", color = GOLD, size = UDim2.new(1, 0, 0, 36), position = UDim2.fromOffset(0, 8), textSize = 30, stroke = 4 })
-	Ui.text(pop, { name = "Help", text = "Press the key in the green zone", color = Color3.fromRGB(200, 215, 255), size = UDim2.new(1, 0, 0, 20), position = UDim2.fromOffset(0, 42), textSize = 16, stroke = 2 })
+	local title = Ui.text(pop, { name = "Title", text = "SUPER PUNCH!", color = GOLD, size = UDim2.new(1, 0, 0, 36), position = UDim2.fromOffset(0, 8), textSize = 30, stroke = 4 })
+	local help = Ui.text(pop, { name = "Help", text = "Press the key in the green zone", color = Color3.fromRGB(200, 215, 255), size = UDim2.new(1, 0, 0, 20), position = UDim2.fromOffset(0, 42), textSize = 16, stroke = 2 })
+	-- no celular o texto encolhe; os quadros das teclas não (no toque eles são os botões)
+	Platform.watch(function()
+		title.TextSize = math.floor(30 * Platform.textScale())
+		help.TextSize = math.floor(16 * Platform.textScale())
+		help.Text = if Platform.isTouch() then "Tap the key in the green zone" else "Press the key in the green zone"
+	end)
 
 	for i = 1, SUPER.steps do
 		local box = Instance.new("TextButton")

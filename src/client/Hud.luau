@@ -14,6 +14,7 @@ local CharacterModels = require(ReplicatedStorage.Shared.CharacterModels)
 local Config = require(ReplicatedStorage.Shared.Config)
 local Format = require(ReplicatedStorage.Shared.Format)
 local Fx = require(script.Parent.Fx)
+local Platform = require(script.Parent.Platform)
 local Ui = require(script.Parent.Ui)
 
 local P = Config.Palette
@@ -328,7 +329,7 @@ local function buildHotbar(root: ScreenGui)
 	Ui.autoScale(block)
 	hintLabel = Ui.text(block, { name = "Hint", text = "", color = P.yellowLine, size = UDim2.new(1, 300, 0, 24), position = UDim2.new(0.5, 0, 0, 0), anchor = Vector2.new(0.5, 0), textSize = 20, stroke = 3 })
 	-- botão da mochila: no teclado é a tecla G; no toque (sem tecla) é este botão
-	local touchOnly = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
+	local touchOnly = Platform.isTouch()
 	local backpack = Ui.frame(block, "BackpackButton", UDim2.fromOffset(210, 30), UDim2.new(0.5, 0, 0, 29), Color3.fromRGB(24, 28, 46), Vector2.new(0.5, 0))
 	backpack.BackgroundTransparency = 0.25
 	Ui.corner(backpack, 10)
@@ -400,6 +401,46 @@ local function buildHotbar(root: ScreenGui)
 end
 
 ---------------------------------------------------------------------------------------------------
+-- Placa de Poder e dinheiro em cima da cabeça (feita pelo servidor): no celular, a cópia local
+-- encolhe para não cobrir a tela. Só muda o que este jogador vê.
+
+-- tabela normal (não fraca): o Roblox pode soltar chaves de Instance numa tabela fraca mesmo com
+-- o objeto vivo; a entrada sai quando a placa é destruída
+local tagSizes: { [BillboardGui]: UDim2 } = {}
+
+local function fitTag(board: BillboardGui)
+	local base = tagSizes[board]
+	if not base then
+		base = board.Size
+		tagSizes[board] = base
+		board.Destroying:Connect(function()
+			tagSizes[board] = nil
+		end)
+	end
+	local k = Platform.tagScale()
+	board.Size = UDim2.new(base.X.Scale * k, base.X.Offset * k, base.Y.Scale * k, base.Y.Offset * k)
+end
+
+local function watchTags()
+	local function consider(object: Instance)
+		if object:IsA("BillboardGui") and object.Name == "StatsTag" then
+			fitTag(object)
+		end
+	end
+	for _, object in workspace:GetDescendants() do
+		consider(object)
+	end
+	workspace.DescendantAdded:Connect(consider)
+	Platform.changed:Connect(function()
+		for board in tagSizes do
+			if board.Parent then
+				fitTag(board)
+			end
+		end
+	end)
+end
+
+---------------------------------------------------------------------------------------------------
 
 function Hud.start()
 	gui = ensureGui()
@@ -413,6 +454,14 @@ function Hud.start()
 
 	buildLeft(gui)
 	local power, money = buildStats(gui)
+	-- dinheiro e Poder menores no celular
+	local stats = gui:FindFirstChild("Stats")
+	if stats then
+		Platform.watch(function()
+			stats:SetAttribute("PlatformScale", Platform.textScale())
+		end)
+	end
+	watchTags()
 	buildTopRight(gui)
 	buildHotbar(gui)
 

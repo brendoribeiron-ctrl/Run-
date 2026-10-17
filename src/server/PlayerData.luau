@@ -8,6 +8,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
 local Config = require(ReplicatedStorage.Shared.Config)
+local HudLayout = require(ReplicatedStorage.Shared.HudLayout)
 
 export type Profile = {
 	version: number,
@@ -29,6 +30,7 @@ export type Profile = {
 	boosts: { [string]: number }, -- poções: id -> hora (do servidor) em que acaba
 	daily: { streak: number, last: number }, -- recompensa diária: dia da sequência e o dia do último resgate
 	quests: { day: number, progress: { [string]: number }, claimed: { [string]: boolean } },
+	hud: string, -- layout do HUD escolhido no editor (JSON de Shared.HudLayout); "" = padrão
 }
 
 type Session = {
@@ -63,6 +65,7 @@ local function defaults(): Profile
 		boosts = {},
 		daily = { streak = 0, last = 0 },
 		quests = { day = 0, progress = {}, claimed = {} },
+		hud = "",
 	}
 end
 
@@ -162,6 +165,7 @@ local function sanitize(raw: any): Profile
 	if type(raw.aura) == "string" and Config.AuraById[raw.aura] and profile.power >= Config.AuraById[raw.aura].power then
 		profile.aura = raw.aura
 	end
+	profile.hud = HudLayout.encode(HudLayout.decode(raw.hud))
 	if type(raw.unlocks) == "table" then
 		for name in Config.Auto do
 			if raw.unlocks[name] == true then
@@ -237,6 +241,7 @@ local function mirror(player: Player, profile: Profile)
 		end
 	end
 	player:SetAttribute("Levels", table.concat(levels, ","))
+	player:SetAttribute("HudLayout", profile.hud)
 end
 
 function PlayerData.load(player: Player): boolean

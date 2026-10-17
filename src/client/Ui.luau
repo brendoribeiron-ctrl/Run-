@@ -130,10 +130,18 @@ function Ui.autoScale(target: GuiObject)
 	scale.Name = "AutoScale"
 	scale.Parent = target
 	local camera = workspace.CurrentCamera
+	-- atributos do alvo: PlatformScale (texto menor no celular, client/Platform.luau) e
+	-- UserScale (tamanho escolhido no editor do HUD)
+	local function factor(name: string): number
+		local value = target:GetAttribute(name)
+		return if type(value) == "number" then value else 1
+	end
 	local function update()
-		scale.Scale = math.clamp(camera.ViewportSize.Y / 900, 0.6, 1.2)
+		scale.Scale = math.clamp(camera.ViewportSize.Y / 900, 0.6, 1.2) * factor("PlatformScale") * factor("UserScale")
 	end
 	camera:GetPropertyChangedSignal("ViewportSize"):Connect(update)
+	target:GetAttributeChangedSignal("PlatformScale"):Connect(update)
+	target:GetAttributeChangedSignal("UserScale"):Connect(update)
 	update()
 end
 

@@ -6,6 +6,7 @@
 //   node tools/upload_assets.cjs --force        envia todos de novo
 //   node tools/upload_assets.cjs <pasta> --out <arquivo.luau>   outra pasta e outro arquivo de ids
 //   node tools/upload_assets.cjs assets/textures --out src/shared/Textures.luau   as texturas
+//   node tools/upload_assets.cjs assets/animations --out src/shared/Animations.luau   as animações
 //
 // Os .png sobem como asset do tipo Image: o id serve direto de Texture/Image no jogo. (Com
 // --type Decal o id devolvido é o do Decal, que não serve de textura.)
@@ -87,11 +88,14 @@ async function waitOperation(operation, key) {
 }
 
 const isImage = (file) => file.toLowerCase().endsWith(".png");
+// .rbxm/.rbxmx com um KeyframeSequence (tools/anim/export.cjs) sobem como asset do tipo Animation
+const isAnimation = (file) => /.rbxmx?$/i.test(file);
+const contentType = (file) => (isImage(file) ? "image/png" : isAnimation(file) ? "model/x-" + path.extname(file).slice(1).toLowerCase() : "model/fbx");
 
 function form(request, file) {
 	const body = new FormData();
 	body.append("request", JSON.stringify(request));
-	body.append("fileContent", new Blob([fs.readFileSync(file)], { type: isImage(file) ? "image/png" : "model/fbx" }), path.basename(file));
+	body.append("fileContent", new Blob([fs.readFileSync(file)], { type: contentType(file) }), path.basename(file));
 	return body;
 }
 
@@ -102,7 +106,7 @@ async function upload(file, name, previousId, env, imageType) {
 		return waitOperation(operation, env.ROBLOX_API_KEY);
 	}
 	const creator = env.ROBLOX_CREATOR_TYPE === "group" ? { groupId: env.ROBLOX_CREATOR_ID } : { userId: env.ROBLOX_CREATOR_ID };
-	const request = { assetType: isImage(file) ? imageType : "Model", displayName: name, description: "Enviado por tools/upload_assets.cjs", creationContext: { creator } };
+	const request = { assetType: isImage(file) ? imageType : isAnimation(file) ? "Animation" : "Model", displayName: name, description: "Enviado por tools/upload_assets.cjs", creationContext: { creator } };
 	const operation = await call("POST", `${API}/assets`, env.ROBLOX_API_KEY, form(request, file));
 	return waitOperation(operation, env.ROBLOX_API_KEY);
 }
@@ -127,8 +131,8 @@ async function main() {
 
 	const manifestFile = path.join(args.folder, "uploaded.json");
 	const manifest = fs.existsSync(manifestFile) ? JSON.parse(fs.readFileSync(manifestFile, "utf8")) : {};
-	const files = fs.readdirSync(args.folder).filter((file) => /.(fbx|png)$/i.test(file)).sort();
-	if (files.length === 0) return console.log("nenhum .fbx ou .png em " + args.folder);
+	const files = fs.readdirSync(args.folder).filter((file) => /.(fbx|png|rbxmx?)$/i.test(file)).sort();
+	if (files.length === 0) return console.log("nenhum .fbx, .png ou .rbxm(x) em " + args.folder);
 
 	const jobs = files.map((file) => {
 		const name = path.basename(file, path.extname(file)).replace(/[^A-Za-z0-9_]/g, "_");

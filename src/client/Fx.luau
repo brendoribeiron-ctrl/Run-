@@ -9,6 +9,7 @@ local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 
 local Config = require(ReplicatedStorage.Shared.Config)
+local Platform = require(script.Parent.Platform)
 local Ui = require(script.Parent.Ui)
 
 local player = Players.LocalPlayer
@@ -173,7 +174,7 @@ end
 
 -- Título grande no centro da tela: entra estalando, segura, some.
 function Fx.title(text: string, color: Color3, hold: number?)
-	local label = Ui.text(gui, { name = "Title", text = text, color = color, size = UDim2.new(0.8, 0, 0, 110), position = UDim2.fromScale(0.5, 0.3), anchor = Vector2.new(0.5, 0.5), stroke = 6, z = 12 })
+	local label = Ui.text(gui, { name = "Title", text = text, color = color, size = UDim2.new(0.8, 0, 0, 110 * Platform.textScale()), position = UDim2.fromScale(0.5, 0.3), anchor = Vector2.new(0.5, 0.5), stroke = 6, z = 12 })
 	label.Rotation = -4
 	local scale = Instance.new("UIScale")
 	scale.Scale = 0
@@ -190,7 +191,7 @@ end
 
 -- Texto curto que sobe e some (números, avisos).
 function Fx.toast(text: string, color: Color3?)
-	local label = Ui.text(gui, { name = "Toast", text = text, color = color or Ui.white, size = UDim2.new(0.6, 0, 0, 44), position = UDim2.fromScale(0.5, 0.72), anchor = Vector2.new(0.5, 0.5), stroke = 4, z = 12 })
+	local label = Ui.text(gui, { name = "Toast", text = text, color = color or Ui.white, size = UDim2.new(0.6, 0, 0, 44 * Platform.textScale()), position = UDim2.fromScale(0.5, 0.72), anchor = Vector2.new(0.5, 0.5), stroke = 4, z = 12 })
 	local scale = Instance.new("UIScale")
 	scale.Scale = 0.4
 	scale.Parent = label

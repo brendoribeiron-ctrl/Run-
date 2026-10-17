@@ -16,6 +16,8 @@ local Worlds = require(script.Parent.Worlds)
 local Auto = require(script.Parent.Auto)
 local Fx = require(script.Parent.Fx)
 local Hud = require(script.Parent.Hud)
+local HudEditor = require(script.Parent.HudEditor)
+local Platform = require(script.Parent.Platform)
 local Mount = require(script.Parent.Mount)
 local Others = require(script.Parent.Others)
 local Move = require(script.Parent.Move)
@@ -912,7 +914,45 @@ local function testHook()
 		return
 	end
 	remote.OnClientInvoke = function(command: string, arg: any): any
-		if command == "wizardTalk" then
+		if command == "hudPlatform" then
+			-- força o tipo de aparelho ("phone", "tablet", "desktop"; nil volta ao detectado)
+			Platform.force(arg)
+			return Platform.kind()
+		elseif command == "hudSet" then
+			HudEditor.set(arg.id, arg.entry)
+			return HudEditor.debug()
+		elseif command == "hudSave" then
+			HudEditor.save()
+			return true
+		elseif command == "hudOpen" then
+			HudEditor.open(arg == true)
+			return HudEditor.debug()
+		elseif command == "hudState" then
+			local state = HudEditor.debug()
+			local hud = player.PlayerGui:FindFirstChild("HUD")
+			local stats = hud and hud:FindFirstChild("Stats")
+			local scale = stats and stats:FindFirstChild("AutoScale")
+			state.statsScale = if scale and scale:IsA("UIScale") then scale.Scale else nil
+			local tag = player.Character and player.Character:FindFirstChild("StatsTag", true)
+			state.tagSize = if tag and tag:IsA("BillboardGui") then tag.Size.X.Scale else nil
+			-- transparência REAL (a que aparece na tela) de um fundo, um texto e um contorno do HUD
+			local slot = hud and hud:FindFirstChild("Slot1", true)
+			local money = hud and hud:FindFirstChild("Money", true)
+			local label = money and (if money:IsA("TextLabel") then money else money:FindFirstChildWhichIsA("TextLabel", true))
+			state.slotBg = if slot and slot:IsA("GuiObject") then slot.BackgroundTransparency else nil
+			state.moneyText = if label then label.TextTransparency else nil
+			local stroke = label and label:FindFirstChildOfClass("UIStroke")
+			state.moneyStroke = if stroke then stroke.Transparency else nil
+			return state
+		elseif command == "hudTouch" then
+			-- simula outro código mexendo numa transparência do HUD (ex.: a hotbar ao trocar de personagem)
+			local hud = player.PlayerGui:FindFirstChild("HUD")
+			local slot = hud and hud:FindFirstChild("Slot1", true)
+			if slot and slot:IsA("GuiObject") then
+				slot.BackgroundTransparency = arg
+			end
+			return slot ~= nil
+		elseif command == "wizardTalk" then
 			Worlds.talk()
 			return Worlds.debug()
 		elseif command == "wizardAccept" then

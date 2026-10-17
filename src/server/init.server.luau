@@ -9,8 +9,10 @@ local ServerStorage = game:GetService("ServerStorage")
 
 local Config = require(ReplicatedStorage.Shared.Config)
 local Format = require(ReplicatedStorage.Shared.Format)
+local HudLayout = require(ReplicatedStorage.Shared.HudLayout)
 local RunMath = require(ReplicatedStorage.Shared.RunMath)
 local Admin = require(script.Admin)
+local CharacterMeshes = require(script.CharacterMeshes)
 local DevArea = require(script.DevArea)
 local Hall = require(script.Hall)
 local Pedestals = require(script.Pedestals)
@@ -35,7 +37,7 @@ local World = require(script.World)
 -- Super: S->C "start", senha, teclas | "result", acertou, ganho | "auto", ganho      C->S senha, acertou
 -- Auto: C->S "buy", nome | "toggle", nome, ligado
 -- Aura: C->S id da aura a equipar          Slot: C->S posição na mochila, slot rápido de destino
-State.createRemotes({ "BagHit", "Charge", "RunResult", "Select", "Fx", "Stat", "GoZone", "Super", "Auto", "Aura", "Slot", "Mount", "Cast", "Sell", "Rebirth", "Potion", "Daily", "Playtime", "Quest", "Fuse", "World", "BossReward", "Boss", "BossHit" })
+State.createRemotes({ "BagHit", "Charge", "RunResult", "Select", "Fx", "Stat", "GoZone", "Super", "Auto", "Aura", "Slot", "Mount", "Cast", "Sell", "Rebirth", "Potion", "Daily", "Playtime", "Quest", "Fuse", "World", "BossReward", "Boss", "BossHit", "HudLayout" })
 local remotes = State.remotes
 
 World.setupLighting()
@@ -43,6 +45,20 @@ World.buildLobby()
 Hall.build(World.buildHallway())
 World.buildBounds()
 DevArea.start(Admin.isAdmin, State.homeCFrame)
+-- modelos de anime dos personagens: quando chegam, refaz os pedestais de quem já entrou
+CharacterMeshes.load(function()
+	for _, player in Players:GetPlayers() do
+		local id = State.plotOf[player]
+		if id then
+			Pedestals.attach(player, State.plots[id])
+		end
+	end
+end)
+-- bonecos de trabalho das animações (tools/anim, Eclipse Animator) ficam só no modo de edição
+local animRigs = workspace:FindFirstChild("AnimRigs")
+if animRigs then
+	animRigs:Destroy()
+end
 -- os modelos vêm da Roblox (uma chamada por modelo): monta em paralelo, sem segurar o servidor
 task.spawn(function()
 	if Sanctum.build() then
@@ -696,6 +712,22 @@ end
 
 remotes.Stat.OnServerEvent:Connect(buyStat)
 remotes.Aura.OnServerEvent:Connect(equipAura)
+-- layout do HUD escolhido no editor do celular: só guarda o que passar pela validação
+local lastHudSave: { [Player]: number } = {}
+remotes.HudLayout.OnServerEvent:Connect(function(player: Player, text: any)
+	local now = os.clock()
+	if type(text) ~= "string" or #text > HudLayout.MAX_LENGTH or now - (lastHudSave[player] or 0) < 0.5 then
+		return
+	end
+	lastHudSave[player] = now
+	local clean = HudLayout.encode(HudLayout.decode(text))
+	PlayerData.update(player, function(p)
+		p.hud = clean
+	end)
+end)
+Players.PlayerRemoving:Connect(function(player)
+	lastHudSave[player] = nil
+end)
 remotes.Mount.OnServerEvent:Connect(useMount)
 remotes.Sell.OnServerEvent:Connect(sellCharacter)
 

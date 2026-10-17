@@ -394,26 +394,28 @@ local function rgb(r: number, g: number, b: number): Color3
 	return Color3.fromRGB(r, g, b)
 end
 
--- hat: none | band | cap | hood | spikes | horns | crown | halo
+-- Mundo 1: elenco de Black Clover. model = chave em Shared.AnimeCast (avatar do catálogo, montado
+-- em ReplicatedStorage.CharacterMeshes); body/pants/glove/hat montam o boneco de peças enquanto
+-- ele não carrega. hat: none | band | cap | hood | spikes | horns | crown | halo
 Config.Characters = {
-	{ id = "rookie_jabber", name = "Rookie Jabber", rarity = 1, income = 1, body = rgb(235, 235, 235), pants = rgb(60, 90, 200), glove = rgb(220, 40, 40), hat = "none" },
-	{ id = "rope_skipper", name = "Rope Skipper", rarity = 1, income = 1, body = rgb(255, 214, 70), pants = rgb(60, 60, 70), glove = rgb(240, 240, 240), hat = "band" },
-	{ id = "bucket_boxer", name = "Bucket Boxer", rarity = 1, income = 2, body = rgb(130, 200, 255), pants = rgb(40, 60, 110), glove = rgb(255, 150, 40), hat = "cap" },
-	{ id = "brick_bruiser", name = "Brick Bruiser", rarity = 2, income = 2, body = rgb(200, 80, 50), pants = rgb(70, 40, 30), glove = rgb(110, 60, 40), hat = "none" },
-	{ id = "turbo_sparrer", name = "Turbo Sparrer", rarity = 2, income = 3, body = rgb(70, 220, 110), pants = rgb(20, 20, 30), glove = rgb(255, 235, 60), hat = "band" },
-	{ id = "dojo_cadet", name = "Dojo Cadet", rarity = 2, income = 4, body = rgb(250, 250, 250), pants = rgb(250, 250, 250), glove = rgb(40, 150, 70), hat = "band" },
-	{ id = "frost_hook", name = "Frost Hook", rarity = 3, income = 6, body = rgb(120, 200, 255), pants = rgb(235, 245, 255), glove = rgb(180, 240, 255), hat = "spikes" },
-	{ id = "volt_kicker", name = "Volt Kicker", rarity = 3, income = 8, body = rgb(40, 60, 160), pants = rgb(20, 20, 40), glove = rgb(255, 240, 60), hat = "spikes" },
-	{ id = "stone_guard", name = "Stone Guard", rarity = 3, income = 10, body = rgb(130, 130, 145), pants = rgb(80, 80, 95), glove = rgb(90, 160, 255), hat = "cap" },
-	{ id = "shadow_sensei", name = "Shadow Sensei", rarity = 4, income = 13, body = rgb(40, 30, 60), pants = rgb(25, 20, 40), glove = rgb(190, 80, 255), hat = "hood" },
-	{ id = "blaze_champion", name = "Blaze Champion", rarity = 4, income = 16, body = rgb(255, 110, 30), pants = rgb(120, 20, 20), glove = rgb(255, 220, 60), hat = "spikes" },
-	{ id = "storm_monk", name = "Storm Monk", rarity = 4, income = 20, body = rgb(150, 90, 230), pants = rgb(245, 240, 255), glove = rgb(120, 240, 255), hat = "halo" },
-	{ id = "golden_gladiator", name = "Golden Gladiator", rarity = 5, income = 28, body = rgb(255, 200, 40), pants = rgb(140, 30, 30), glove = rgb(255, 235, 140), hat = "crown" },
-	{ id = "titan_wrestler", name = "Titan Wrestler", rarity = 5, income = 36, body = rgb(30, 160, 150), pants = rgb(255, 170, 40), glove = rgb(255, 120, 30), hat = "horns" },
-	{ id = "comet_striker", name = "Comet Striker", rarity = 5, income = 46, body = rgb(255, 150, 60), pants = rgb(30, 30, 70), glove = rgb(120, 220, 255), hat = "halo" },
-	{ id = "void_emperor", name = "Void Emperor", rarity = 6, income = 60, body = rgb(30, 10, 50), pants = rgb(15, 5, 25), glove = rgb(255, 40, 90), hat = "crown" },
-	{ id = "solar_colossus", name = "Solar Colossus", rarity = 6, income = 80, body = rgb(255, 235, 120), pants = rgb(255, 120, 20), glove = rgb(255, 60, 30), hat = "horns" },
-	{ id = "abyss_titan", name = "Abyss Titan", rarity = 6, income = 110, body = rgb(20, 40, 90), pants = rgb(10, 15, 40), glove = rgb(60, 255, 220), hat = "horns" },
+	{ id = "rookie_jabber", name = "Magna Swing", model = "magna", rarity = 1, income = 1, body = rgb(235, 235, 235), pants = rgb(60, 90, 200), glove = rgb(220, 40, 40), hat = "none" },
+	{ id = "rope_skipper", name = "Luck Voltia", model = "luck", rarity = 1, income = 1, body = rgb(255, 214, 70), pants = rgb(60, 60, 70), glove = rgb(240, 240, 240), hat = "band" },
+	{ id = "bucket_boxer", name = "Secre Swallowtail", model = "secre", rarity = 1, income = 2, body = rgb(130, 200, 255), pants = rgb(40, 60, 110), glove = rgb(255, 150, 40), hat = "cap" },
+	{ id = "brick_bruiser", name = "Vanessa Enoteca", model = "vanessa", rarity = 2, income = 2, body = rgb(200, 80, 50), pants = rgb(70, 40, 30), glove = rgb(110, 60, 40), hat = "none" },
+	{ id = "turbo_sparrer", name = "Zora Ideale", model = "zora", rarity = 2, income = 3, body = rgb(70, 220, 110), pants = rgb(20, 20, 30), glove = rgb(255, 235, 60), hat = "band" },
+	{ id = "dojo_cadet", name = "Mimosa Vermillion", model = "mimosa", rarity = 2, income = 4, body = rgb(250, 250, 250), pants = rgb(250, 250, 250), glove = rgb(40, 150, 70), hat = "band" },
+	{ id = "frost_hook", name = "Noelle Silva", model = "noelle", rarity = 3, income = 6, body = rgb(120, 200, 255), pants = rgb(235, 245, 255), glove = rgb(180, 240, 255), hat = "spikes" },
+	{ id = "volt_kicker", name = "Yuno", model = "yuno", rarity = 3, income = 8, body = rgb(40, 60, 160), pants = rgb(20, 20, 40), glove = rgb(255, 240, 60), hat = "spikes" },
+	{ id = "stone_guard", name = "Nacht Faust", model = "nacht", rarity = 3, income = 10, body = rgb(130, 130, 145), pants = rgb(80, 80, 95), glove = rgb(90, 160, 255), hat = "cap" },
+	{ id = "shadow_sensei", name = "Asta", model = "asta", rarity = 4, income = 13, body = rgb(40, 30, 60), pants = rgb(25, 20, 40), glove = rgb(190, 80, 255), hat = "hood" },
+	{ id = "blaze_champion", name = "Mereoleona Vermillion", model = "mereoleona", rarity = 4, income = 16, body = rgb(255, 110, 30), pants = rgb(120, 20, 20), glove = rgb(255, 220, 60), hat = "spikes" },
+	{ id = "storm_monk", name = "Fuegoleon Vermillion", model = "fuegoleon", rarity = 4, income = 20, body = rgb(150, 90, 230), pants = rgb(245, 240, 255), glove = rgb(120, 240, 255), hat = "halo" },
+	{ id = "golden_gladiator", name = "Yami Sukehiro", model = "yami", rarity = 5, income = 28, body = rgb(255, 200, 40), pants = rgb(140, 30, 30), glove = rgb(255, 235, 140), hat = "crown" },
+	{ id = "titan_wrestler", name = "Zenon Zogratis", model = "zenon", rarity = 5, income = 36, body = rgb(30, 160, 150), pants = rgb(255, 170, 40), glove = rgb(255, 120, 30), hat = "horns" },
+	{ id = "comet_striker", name = "Dante Zogratis", model = "dante", rarity = 5, income = 46, body = rgb(255, 150, 60), pants = rgb(30, 30, 70), glove = rgb(120, 220, 255), hat = "halo" },
+	{ id = "void_emperor", name = "Julius Novachrono", model = "julius", rarity = 6, income = 60, body = rgb(30, 10, 50), pants = rgb(15, 5, 25), glove = rgb(255, 40, 90), hat = "crown" },
+	{ id = "solar_colossus", name = "Lucius Zogratis", model = "lucius", rarity = 6, income = 80, body = rgb(255, 235, 120), pants = rgb(255, 120, 20), glove = rgb(255, 60, 30), hat = "horns" },
+	{ id = "abyss_titan", name = "Demon Asta", model = "demon", rarity = 6, income = 110, body = rgb(20, 40, 90), pants = rgb(10, 15, 40), glove = rgb(60, 255, 220), hat = "horns" },
 }
 
 -- Super soco: cada soco no saco tem uma chance pequena (menor que a do crítico) de abrir um
